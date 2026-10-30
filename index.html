@@ -222,6 +222,26 @@ button:active{transform:scale(.94)}
 .egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:6px}
 .eb{min-height:48px;font-size:24px;padding:0}
 #emo{min-width:44px;padding:0}
+/* ---------- Messagium ---------- */
+#mgfx{position:fixed;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+.fxp{position:fixed;line-height:1;will-change:transform}
+.bub.typing{position:relative;overflow:visible}
+.bub.typing[class*=mg-]{margin-top:34px}
+.mgd,.fl{position:absolute;pointer-events:none;line-height:1}
+.mg-monkey .mgd{left:16px;top:-32px;font-size:30px;transform-origin:50% 100%;animation:swing 1.1s ease-in-out infinite alternate}
+@keyframes swing{from{transform:rotate(-24deg)}to{transform:rotate(24deg)}}
+.mg-florist .mgd{left:calc(100% + 4px);bottom:0;font-size:28px}
+.fl{top:-18px;font-size:17px;transform-origin:50% 100%;transform:scale(0);animation:grow 2.4s ease-in-out infinite}
+@keyframes grow{0%,8%{transform:scale(0)}30%,78%{transform:scale(1)}100%{transform:scale(0)}}
+.mg-rocket .mgd{left:0;top:-30px;font-size:26px;animation:fly 1.5s ease-in-out infinite alternate}
+@keyframes fly{from{transform:translate(0,3px)}to{transform:translate(46px,-5px)}}
+.mg-cat .mgd{left:calc(100% + 2px);bottom:-2px;font-size:28px}
+.mg-cat .paw{left:28px;top:-22px;font-size:18px;transform-origin:50% 0;animation:swat .6s ease-in-out infinite alternate}
+@keyframes swat{from{transform:rotate(-28deg)}to{transform:rotate(28deg)}}
+.mg-cat i{animation-duration:.6s}
+.mgcard{display:grid;gap:6px;padding:12px;border:1px solid var(--line);border-radius:18px}
+.mgcard.on{border-color:var(--accent)}
+.mgcard .bub{margin-bottom:6px}
 </style>
 </head>
 <body>
@@ -1696,7 +1716,7 @@ function send(){
   $('text').value='';$('text').style.height='';
   if(cur==='claude'){sendToClaude(text);return;}
   const gf=S.friends.find(x=>x.id===cur);if(gf&&gf.group){sendGroup(gf,text);return;}
-  const m={mine:true,text,t:Date.now(),ok:false,id:rnd(10)};{const em=pickEm(text);if(em)m.em=em;}
+  const m={mine:true,text,t:Date.now(),ok:false,id:rnd(10)};{const em=pickEm(text);if(em)m.em=em;playSend(S.me.mg);}
   (S.msgs[cur]=S.msgs[cur]||[]).push(m);
   saveData();trySend(cur,m);renderAll();
 }
@@ -1704,7 +1724,7 @@ const inflight=new Set();
 function trySend(uid,m){
   if(!m.id)m.id=rnd(10);
   const c=connOf(uid);
-  if(c&&c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify({text:m.text,t:m.t,id:m.id,em:m.em}));m.ok=true;saveData();return;}catch(e){}}
+  if(c&&c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify({text:m.text,t:m.t,id:m.id,em:m.em,mg:S.me.mg}));m.ok=true;saveData();return;}catch(e){}}
   const f=S.friends.find(x=>x.id===uid);
   if(CAN_RELAY&&f&&f.key&&m.text.length<2000&&!inflight.has(m.id)){
     inflight.add(m.id);
@@ -1718,7 +1738,7 @@ const b64=u=>{let t='';for(const x of u)t+=String.fromCharCode(x);return btoa(t)
 const unb64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
 async function ckey(f){return keyCache[f.key]||(keyCache[f.key]=await crypto.subtle.importKey('raw',unb64(f.key),'AES-GCM',false,['encrypt','decrypt']));}
 async function ftopic(f){const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('t'+f.key));return 'mesinter-m-'+Array.from(new Uint8Array(d).slice(0,12),x=>x.toString(16).padStart(2,'0')).join('');}
-const relaySend=(f,m)=>relayRaw(f,{id:m.id,from:S.me.id,text:m.text,t:m.t});
+const relaySend=(f,m)=>relayRaw(f,{id:m.id,from:S.me.id,text:m.text,t:m.t,mg:S.me.mg});
 async function relayRaw(f,o){
   const iv=crypto.getRandomValues(new Uint8Array(12));
   const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},await ckey(f),new TextEncoder().encode(JSON.stringify(o))));
@@ -1757,7 +1777,7 @@ function applyKey(uid,m){
   if(!CAN_RELAY||!f||typeof m.k!=='string'||m.k.length!==44||S.me.id<f.id)return;
   f.key=m.k;saveData();relaySub(f);renderAll();
 }
-const typing={},imgBuf={},seenN={};let call=null,lastChat=null;
+const typing={},typingMg={},imgBuf={},seenN={};let call=null,lastChat=null;
 function bubBody(m){
   if(m.img)return h('img',{src:m.img,alt:'photo'});
   return /^https?:\/\/\S+\.(gif|png|jpe?g|webp)(\?\S*)?$/i.test(m.text||'')?h('img',{src:m.text,alt:'image',referrerPolicy:'no-referrer',loading:'lazy'}):emojiText(m);
@@ -1913,6 +1933,56 @@ function openEmojis(){
       h('button',{class:'ghost danger',text:'Supprimer',onclick:()=>{S.emojis=(S.emojis||[]).filter(x=>x!==e);saveData();openEmojis();}})))):h('p',{class:'muted',text:'Aucun émoji pour l\'instant.'}),
     h('hr'),file,h('button',{text:'Choisir une image',onclick:()=>file.click()}),nm,h('button',{class:'primary',text:'Ajouter',onclick:add}),err]);
 }
+/* ---------- Messagium : personnages animés ---------- */
+const MG=[
+ {id:'monkey',n:'Le singe',e:'🐒',d:'Se balance sur tes points quand tu écris, lance des bananes quand tu envoies.'},
+ {id:'florist',n:'Le fleuriste',e:'🧑‍🌾',d:'Plante des fleurs sur tes points, puis les arrose à l\'envoi.'},
+ {id:'rocket',n:'L\'astronaute',e:'🚀',d:'Une fusée vole autour de tes points et décolle à l\'envoi.'},
+ {id:'cat',n:'Le chat',e:'🐱',d:'Joue avec tes points, puis court avec des pattes et des cœurs.'}];
+const MGIDS=MG.map(x=>x.id);
+const CAN='<svg viewBox="0 0 64 48" width="76" height="56"><path d="M10 14h30v26a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4z" fill="#4aa3df"/><path d="M40 20l18-10 3 5-21 14z" fill="#4aa3df"/><path d="M12 14c0-9 26-9 26 0" fill="none" stroke="#2a74a8" stroke-width="4"/></svg>';
+function mgDeco(id){
+  if(id==='monkey')return [h('span',{class:'mgd',text:'🐒'})];
+  if(id==='florist')return [h('span',{class:'mgd',text:'🧑‍🌾'}),...['🌷','🌸','🌼'].map((f,i)=>h('span',{class:'fl',style:'left:'+(10+i*11)+'px;animation-delay:'+(i*.45)+'s',text:f}))];
+  if(id==='rocket')return [h('span',{class:'mgd',text:'🚀'})];
+  if(id==='cat')return [h('span',{class:'mgd',text:'🐱'}),h('span',{class:'mgd paw',text:'🐾'})];
+  return [];
+}
+function fxPart(ch,x,y,kf,opt,sz){
+  const e=document.createElement('div');e.className='fxp';
+  if(ch.charAt(0)==='<')e.innerHTML=ch;else e.textContent=ch;
+  e.style.cssText='left:'+x+'px;top:'+y+'px;font-size:'+(sz||34)+'px';
+  let L=$('mgfx');if(!L){L=document.createElement('div');L.id='mgfx';document.body.append(L);}
+  L.append(e);const a=e.animate(kf,Object.assign({fill:'forwards',easing:'ease-out'},opt));a.onfinish=()=>e.remove();
+}
+function playSend(id){
+  if(!MGIDS.includes(id)||!window.Element||!Element.prototype.animate||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const W=innerWidth,H=innerHeight,r=Math.random,sx=W/2,sy=H-90;
+  if(id==='monkey'){
+    for(let i=0;i<14;i++){const dx=(r()-.5)*W*.9,up=H*(.45+r()*.4);
+      fxPart('🍌',sx,sy,[{transform:'translate(0,0) rotate(0)',opacity:1},{transform:'translate('+dx*.6+'px,'+(-up)+'px) rotate('+r()*360+'deg)',opacity:1,offset:.45},{transform:'translate('+dx+'px,'+H*.15+'px) rotate('+r()*720+'deg)',opacity:0}],{duration:1500+r()*600,delay:i*45,easing:'cubic-bezier(.3,.6,.5,1)'},30);}
+  }else if(id==='florist'){
+    fxPart(CAN,W-100,H*.3,[{transform:'translate(120px,-20px) rotate(0)',opacity:0},{transform:'translate(0,0) rotate(0)',opacity:1,offset:.2},{transform:'translate(0,0) rotate(-32deg)',opacity:1,offset:.35},{transform:'translate(0,0) rotate(-32deg)',opacity:1,offset:.85},{transform:'translate(120px,-20px) rotate(0)',opacity:0}],{duration:2200});
+    for(let i=0;i<16;i++)fxPart('💧',W-150-r()*40,H*.3+44,[{transform:'translate(0,0)',opacity:0},{opacity:1,offset:.2},{transform:'translate('+(-r()*50)+'px,'+H*.55+'px)',opacity:0}],{duration:900,delay:400+i*70,easing:'ease-in'},16);
+    for(let i=0;i<7;i++)fxPart(['🌷','🌸','🌼','🌻','🌺'][i%5],W*(.08+i*.13),H-80,[{transform:'scale(0) translateY(20px)',opacity:0},{transform:'scale(1.15) translateY(0)',opacity:1,offset:.4},{transform:'scale(1) translateY(0)',opacity:1,offset:.8},{transform:'scale(1) translateY(0)',opacity:0}],{duration:2200,delay:900+i*120},36);
+  }else if(id==='rocket'){
+    fxPart('🚀',20,H-120,[{transform:'translate(0,0)',opacity:1},{transform:'translate('+W*.9+'px,'+(-H*.75)+'px)',opacity:1,offset:.9},{transform:'translate('+W+'px,'+(-H*.85)+'px)',opacity:0}],{duration:1300,easing:'cubic-bezier(.5,0,.8,.6)'},44);
+    for(let i=0;i<14;i++)fxPart(i%2?'✨':'⭐',20+W*.06*i,H-110-H*.05*i,[{transform:'scale(0)',opacity:0},{transform:'scale(1) rotate(60deg)',opacity:1,offset:.3},{transform:'scale(0) rotate(180deg)',opacity:0}],{duration:900,delay:60*i},20);
+  }else{
+    fxPart('🐱',-60,H-110,[{transform:'translate(0,0)'},{transform:'translate('+W*.4+'px,-40px)',offset:.3},{transform:'translate('+W*.7+'px,0)',offset:.6},{transform:'translate('+(W+120)+'px,-30px)'}],{duration:1600,easing:'linear'},46);
+    for(let i=0;i<8;i++)fxPart('🐾',W*.08*i,H-80,[{opacity:0,transform:'scale(.5)'},{opacity:1,transform:'scale(1)',offset:.2},{opacity:0}],{duration:1000,delay:i*150},22);
+    for(let i=0;i<10;i++)fxPart('❤️',sx+(r()-.5)*W*.7,sy,[{transform:'translateY(0) scale(.6)',opacity:0},{opacity:1,offset:.2},{transform:'translateY('+(-H*.5)+'px) scale(1.1)',opacity:0}],{duration:1500,delay:i*110},24);
+  }
+}
+function openMessagium(){
+  const set=id=>()=>{if(id)S.me.mg=id;else delete S.me.mg;saveData();toast(id?'Messagium : '+MG.find(x=>x.id===id).n:'Messagium désactivé');openMessagium();};
+  openOverlay([header('Messagium'),h('p',{class:'muted',text:'Choisis ton personnage : tes amis le voient quand tu écris et quand tu envoies.'}),
+    ...MG.map(x=>h('div',{class:'mgcard'+(S.me.mg===x.id?' on':'')},
+      h('div',{class:'bub typing mg-'+x.id},h('i'),h('i'),h('i'),...mgDeco(x.id)),
+      h('b',{text:x.e+' '+x.n}),h('div',{class:'muted',text:x.d}),
+      h('div',{class:'row'},h('button',{text:'Aperçu',onclick:()=>playSend(x.id)}),h('button',{class:S.me.mg===x.id?'':'primary',text:S.me.mg===x.id?'Choisi ✓':'Choisir',onclick:set(x.id)})))),
+    S.me.mg?h('button',{class:'ghost',text:'Sans Messagium',onclick:set(null)}):null]);
+}
 function profileMsg(){return {type:'profile',name:S.me.name,hue:S.me.hue,photo:S.me.photo||null,bio:S.me.bio||'',accent:typeof S.me.accent==='number'?S.me.accent:null};}
 function bannerMsg(){return {type:'banner',banner:S.me.banner||null};}
 function sendProfile(c){if(c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify(profileMsg()));c.dc.send(JSON.stringify(bannerMsg()));}catch(e){}}}
@@ -1927,7 +1997,7 @@ function applyProfile(uid,m){
 }
 function applyBanner(uid,m){const f=S.friends.find(x=>x.id===uid);if(!f)return;f.banner=(typeof m.banner==='string'&&m.banner.startsWith('data:image/')&&m.banner.length<150000)?m.banner:null;saveData();renderAll();}
 function receive(id,m){
-  if(m&&m.type==='typing'){typing[id]=Date.now();if(cur===id)renderChat();setTimeout(()=>{if(cur===id&&Date.now()-typing[id]>=3900)renderChat();},4000);return;}
+  if(m&&m.type==='typing'){typing[id]=Date.now();typingMg[id]=MGIDS.includes(m.mg)?m.mg:null;if(cur===id)renderChat();setTimeout(()=>{if(cur===id&&Date.now()-typing[id]>=3900)renderChat();},4000);return;}
   if(m&&m.type==='del'){delMsg(id,m.id);return;}
   if(m&&m.type==='img'){onImg(id,m);return;}
   if(m&&m.type==='call'){onCall(id,m);return;}
@@ -1942,6 +2012,7 @@ function receive(id,m){
   if(m.id){const l=((S.seen=S.seen||{})[id]=S.seen[id]||[]);if(l.includes(m.id))return;l.push(m.id);if(l.length>300)l.shift();}
   delete typing[id];
   (S.msgs[id]=S.msgs[id]||[]).push({mine:false,id:typeof m.id==='string'?m.id.slice(0,20):undefined,em:cleanEm(m.em),text:m.text.slice(0,4000),t:m.t||Date.now()});
+  if(cur===id&&!document.hidden)playSend(MGIDS.includes(m.mg)?m.mg:null);
   if(cur!==id)S.unread[id]=(S.unread[id]||0)+1;
   saveData();renderAll();
 }
@@ -2017,7 +2088,7 @@ function renderChat(){
     ));
   }
   seenN[f.id]=msgs.length;
-  if(typing[f.id]&&Date.now()-typing[f.id]<4000)box.append(h('div',{class:'bub typing',title:'écrit…'},h('i'),h('i'),h('i')));
+  if(typing[f.id]&&Date.now()-typing[f.id]<4000)box.append(h('div',{class:'bub typing'+(typingMg[f.id]?' mg-'+typingMg[f.id]:''),title:'écrit…'},h('i'),h('i'),h('i'),...mgDeco(typingMg[f.id])));
   if(!f.group&&!f.ai&&p!=='live')box.append(h('div',{class:'notice'},h('span',{text:p==='attente'?'Connexion en cours…':(f.key&&CAN_RELAY?'Connexion directe coupée : les messages passent par le relais (Internet requis).':'Hors ligne : tes messages partiront dès que la connexion revient.')}),p==='attente'?null:h('button',{class:'primary',text:'Reconnecter',onclick:openAdd})));
   box.scrollTop=box.scrollHeight;
 }
@@ -2396,6 +2467,7 @@ function openProfile(){
   openOverlay([header('Mon profil'),pp,pb,profHead(S.me,S.me.name),
     h('div',{class:'row'},h('button',{text:'Changer la bannière',onclick:()=>pb.click()}),S.me.banner?h('button',{class:'ghost',text:'Retirer',onclick:clear('banner')}):null),
     h('div',{class:'row'},h('button',{text:'Changer la photo',onclick:()=>pp.click()}),S.me.photo?h('button',{class:'ghost',text:'Retirer',onclick:clear('photo')}):null),
+    h('button',{text:'Messagium : '+((MG.find(x=>x.id===S.me.mg)||{n:'aucun'}).n),onclick:openMessagium}),
     h('label',{class:'muted',text:'Votre nom'}),nm,h('label',{class:'muted',text:'Statut'}),bio,
     h('label',{class:'muted',text:'Couleur'}),h('div',{class:'row'},...sw),
     h('button',{class:'primary',text:'Enregistrer',onclick:()=>{const v=nm.value.trim();if(!v)return;S.me.name=v;S.me.bio=bio.value.trim().slice(0,80);saveData();broadcastProfile();renderAll();toast('Profil mis à jour');closeOverlay();}}),
@@ -2447,7 +2519,7 @@ $('picIn').onchange=async()=>{
   }catch(e){toast('Image non prise en charge');}
 };
 let lastTyp=0;
-$('text').addEventListener('input',()=>{const f=S.friends.find(x=>x.id===cur);if(!f||f.group||f.ai||Date.now()-lastTyp<2500)return;lastTyp=Date.now();const c=connOf(f.id);if(c&&c.dc&&c.dc.readyState==='open')dcSend(c,{type:'typing'});});
+$('text').addEventListener('input',()=>{const f=S.friends.find(x=>x.id===cur);if(!f||f.group||f.ai||Date.now()-lastTyp<2500)return;lastTyp=Date.now();const c=connOf(f.id);if(c&&c.dc&&c.dc.readyState==='open')dcSend(c,{type:'typing',mg:S.me.mg});});
 $('q').addEventListener('input',renderSide);
 $('compose').addEventListener('submit',e=>{e.preventDefault();send();});
 $('text').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
