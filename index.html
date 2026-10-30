@@ -215,6 +215,13 @@ button:active{transform:scale(.94)}
   #friends{padding-bottom:60px}
   body:has(#app.open) #sheetHandle{display:none}
 }
+.cem{width:24px;height:24px;object-fit:contain;vertical-align:-6px;margin:0 1px}
+.cem.big{width:36px;height:36px;vertical-align:middle}
+.bub img.cem{display:inline;width:24px;height:24px;max-height:none;border-radius:0}
+.bub .jumbo img.cem{width:48px;height:48px;vertical-align:-10px}
+.egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:6px}
+.eb{min-height:48px;font-size:24px;padding:0}
+#emo{min-width:44px;padding:0}
 </style>
 </head>
 <body>
@@ -247,7 +254,7 @@ button:active{transform:scale(.94)}
     </div>
     <div id="msgs"></div>
     <form id="compose">
-      <button id="pic" type="button" class="ghost" aria-label="Photo ou GIF">📷</button><input id="picIn" type="file" accept="image/*" hidden>
+      <button id="emo" type="button" class="ghost" aria-label="Émojis">😀</button><button id="pic" type="button" class="ghost" aria-label="Photo ou GIF">📷</button><input id="picIn" type="file" accept="image/*" hidden>
       <textarea id="text" rows="1" placeholder="Écrire un message" disabled></textarea>
       <button id="send" class="primary" type="submit" disabled>Envoyer</button>
     </form>
@@ -1689,7 +1696,7 @@ function send(){
   $('text').value='';$('text').style.height='';
   if(cur==='claude'){sendToClaude(text);return;}
   const gf=S.friends.find(x=>x.id===cur);if(gf&&gf.group){sendGroup(gf,text);return;}
-  const m={mine:true,text,t:Date.now(),ok:false,id:rnd(10)};
+  const m={mine:true,text,t:Date.now(),ok:false,id:rnd(10)};{const em=pickEm(text);if(em)m.em=em;}
   (S.msgs[cur]=S.msgs[cur]||[]).push(m);
   saveData();trySend(cur,m);renderAll();
 }
@@ -1697,7 +1704,7 @@ const inflight=new Set();
 function trySend(uid,m){
   if(!m.id)m.id=rnd(10);
   const c=connOf(uid);
-  if(c&&c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify({text:m.text,t:m.t,id:m.id}));m.ok=true;saveData();return;}catch(e){}}
+  if(c&&c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify({text:m.text,t:m.t,id:m.id,em:m.em}));m.ok=true;saveData();return;}catch(e){}}
   const f=S.friends.find(x=>x.id===uid);
   if(CAN_RELAY&&f&&f.key&&m.text.length<2000&&!inflight.has(m.id)){
     inflight.add(m.id);
@@ -1753,7 +1760,7 @@ function applyKey(uid,m){
 const typing={},imgBuf={},seenN={};let call=null,lastChat=null;
 function bubBody(m){
   if(m.img)return h('img',{src:m.img,alt:'photo'});
-  return /^https?:\/\/\S+\.(gif|png|jpe?g|webp)(\?\S*)?$/i.test(m.text||'')?h('img',{src:m.text,alt:'image',referrerPolicy:'no-referrer',loading:'lazy'}):h('div',{text:m.text});
+  return /^https?:\/\/\S+\.(gif|png|jpe?g|webp)(\?\S*)?$/i.test(m.text||'')?h('img',{src:m.text,alt:'image',referrerPolicy:'no-referrer',loading:'lazy'}):emojiText(m);
 }
 function msgMenu(f,m){
   const drop=()=>{S.msgs[f.id]=(S.msgs[f.id]||[]).filter(x=>x!==m);saveData();closeOverlay();renderAll();};
@@ -1847,6 +1854,65 @@ async function onSig(f,p){
     try{await acceptAnswer(p.card,true);}catch(e){}
   }
 }
+/* ---------- Émojis perso ---------- */
+const EMRE=/:([a-z0-9_]{2,20}):/gi;
+const UNI='😀 😂 🤣 😊 😍 😘 😎 🤔 😭 😡 🥳 😴 🤯 😅 😉 🙃 😬 😱 🥹 🤝 👍 👎 👏 🙏 💪 👀 🔥 ✨ 💯 ❤️ 💔 🎉 🎮 🍕 ☕ 🌙 ⭐'.split(' ');
+const myEm=n=>(S.emojis||[]).find(e=>e.name===n.toLowerCase());
+function pickEm(t){const o={};let k=0;for(const x of t.matchAll(EMRE)){const e=myEm(x[1]);if(e&&!o[e.name]&&k<4){o[e.name]=e.img;k++;}}return k?o:null;}
+function cleanEm(o){
+  if(!o||typeof o!=='object')return undefined;const r={};let k=0;
+  for(const n in o){if(k>=4)break;if(/^[a-z0-9_]{2,20}$/.test(n)&&typeof o[n]==='string'&&o[n].startsWith('data:image/')&&o[n].length<60000){r[n]=o[n];k++;}}
+  return k?r:undefined;
+}
+function emojiText(m){
+  const t=m.text||'',parts=[];let last=0,only=true,n=0;
+  for(const x of t.matchAll(EMRE)){
+    const nm=x[1].toLowerCase(),src=(m.em&&m.em[nm])||(myEm(nm)||{}).img;
+    if(!src)continue;
+    const before=t.slice(last,x.index);
+    if(before){parts.push(document.createTextNode(before));if(before.trim())only=false;}
+    parts.push(h('img',{class:'cem',src,alt:':'+nm+':'}));n++;last=x.index+x[0].length;
+  }
+  const rest=t.slice(last);
+  if(rest){parts.push(document.createTextNode(rest));if(rest.trim())only=false;}
+  const d=h('div',{},...parts);
+  if(n&&only&&n<=5)d.classList.add('jumbo');
+  return d;
+}
+function insertText(t){const x=$('text'),a=x.selectionStart==null?x.value.length:x.selectionStart,b=x.selectionEnd==null?a:x.selectionEnd;x.value=x.value.slice(0,a)+t+x.value.slice(b);x.focus();x.setSelectionRange(a+t.length,a+t.length);x.dispatchEvent(new Event('input'));}
+function emojiImg(file){return new Promise((res,rej)=>{
+  if(file.type==='image/gif'&&file.size<=100000){const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(file);return;}
+  const img=new Image(),url=URL.createObjectURL(file);
+  img.onload=()=>{const k=Math.min(64/img.width,64/img.height),w=Math.max(1,Math.round(img.width*k)),hh=Math.max(1,Math.round(img.height*k)),c=document.createElement('canvas');c.width=w;c.height=hh;c.getContext('2d').drawImage(img,0,0,w,hh);URL.revokeObjectURL(url);res(c.toDataURL('image/png'));};
+  img.onerror=()=>{URL.revokeObjectURL(url);rej();};img.src=url;});}
+function openEmojiPicker(){
+  const pick=t=>()=>{closeOverlay();insertText(t);};
+  const mine=(S.emojis||[]).map(e=>h('button',{class:'ghost eb',title:':'+e.name+':',onclick:pick(':'+e.name+':')},h('img',{class:'cem big',src:e.img,alt:e.name})));
+  openOverlay([header('Émojis'),h('p',{class:'muted',text:'Mes émojis perso'}),
+    mine.length?h('div',{class:'egrid'},...mine):h('p',{class:'muted',text:'Aucun pour l\'instant.'}),
+    h('button',{text:'Ajouter ou gérer mes émojis',onclick:openEmojis}),
+    h('p',{class:'muted',text:'Classiques'}),
+    h('div',{class:'egrid'},...UNI.map(u=>h('button',{class:'ghost eb',text:u,onclick:pick(u)})))]);
+}
+function openEmojis(){
+  const list=S.emojis=S.emojis||[];
+  const file=h('input',{type:'file',accept:'image/*',hidden:true});
+  const nm=h('input',{placeholder:'Nom (ex : gg, lol_zeb)',maxLength:20});
+  const err=h('div',{class:'err'});
+  file.addEventListener('change',()=>{const f=file.files[0];if(f&&!nm.value)nm.value=f.name.replace(/\.[^.]*$/,'').toLowerCase().replace(/[^a-z0-9_]/g,'_').slice(0,20);});
+  const add=async()=>{
+    const f=file.files[0],n=nm.value.trim().toLowerCase();err.textContent='';
+    if(!f){err.textContent='Choisis une image.';return;}
+    if(!/^[a-z0-9_]{2,20}$/.test(n)){err.textContent='Nom : 2 à 20 lettres, chiffres ou _';return;}
+    if(list.length>=30&&!list.some(e=>e.name===n)){err.textContent='30 émojis maximum.';return;}
+    try{const img=await emojiImg(f),i=list.findIndex(e=>e.name===n);if(i>=0)list[i]={name:n,img};else list.push({name:n,img});saveData();openEmojis();toast(':'+n+': ajouté');}
+    catch(e){err.textContent='Image non prise en charge';}
+  };
+  openOverlay([header('Mes émojis'),h('p',{class:'muted',text:'Écris :nom: dans un message pour l\'utiliser. Tes amis le voient aussi.'}),
+    list.length?h('div',{class:'grid'},...list.map(e=>h('div',{class:'row'},h('img',{class:'cem big',src:e.img,alt:''}),h('div',{class:'grow',text:':'+e.name+':'}),
+      h('button',{class:'ghost danger',text:'Supprimer',onclick:()=>{S.emojis=(S.emojis||[]).filter(x=>x!==e);saveData();openEmojis();}})))):h('p',{class:'muted',text:'Aucun émoji pour l\'instant.'}),
+    h('hr'),file,h('button',{text:'Choisir une image',onclick:()=>file.click()}),nm,h('button',{class:'primary',text:'Ajouter',onclick:add}),err]);
+}
 function profileMsg(){return {type:'profile',name:S.me.name,hue:S.me.hue,photo:S.me.photo||null,bio:S.me.bio||'',accent:typeof S.me.accent==='number'?S.me.accent:null};}
 function bannerMsg(){return {type:'banner',banner:S.me.banner||null};}
 function sendProfile(c){if(c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify(profileMsg()));c.dc.send(JSON.stringify(bannerMsg()));}catch(e){}}}
@@ -1875,7 +1941,7 @@ function receive(id,m){
   if(typeof m.text!=='string')return;
   if(m.id){const l=((S.seen=S.seen||{})[id]=S.seen[id]||[]);if(l.includes(m.id))return;l.push(m.id);if(l.length>300)l.shift();}
   delete typing[id];
-  (S.msgs[id]=S.msgs[id]||[]).push({mine:false,text:m.text.slice(0,4000),t:m.t||Date.now()});
+  (S.msgs[id]=S.msgs[id]||[]).push({mine:false,id:typeof m.id==='string'?m.id.slice(0,20):undefined,em:cleanEm(m.em),text:m.text.slice(0,4000),t:m.t||Date.now()});
   if(cur!==id)S.unread[id]=(S.unread[id]||0)+1;
   saveData();renderAll();
 }
@@ -2301,6 +2367,7 @@ function showLaunch(){
       n?h('button',{text:'Ajouter un ami',onclick:go(openAdd)}):null,
       h('button',{text:'Parler à Mesinter IA',onclick:()=>openChat('claude')}),
       h('button',{text:'Mon profil',onclick:go(openProfile)}),
+      h('button',{text:'Mes émojis perso',onclick:go(openEmojis)}),
       h('button',{text:'Clé API Mesinter IA',onclick:openKeyDialog}),
       h('button',{text:'Exporter mes données',onclick:exportAll}),
       h('button',{text:'Importer une sauvegarde',onclick:()=>imp.click()}),
@@ -2370,6 +2437,7 @@ $('menuBtn').onclick=()=>{const f=S.friends.find(x=>x.id===cur);if(f)openMenu(f)
 $('chPeer').onclick=()=>{const f=S.friends.find(x=>x.id===cur);if(f)openFriendProfile(f);};
 $('callBtn').onclick=()=>{const f=S.friends.find(x=>x.id===cur);if(f)startCall(f);};
 $('pic').onclick=()=>{if(cur)$('picIn').click();};
+$('emo').onclick=()=>{if(cur)openEmojiPicker();};
 $('picIn').onchange=async()=>{
   const file=$('picIn').files[0];$('picIn').value='';const f=S.friends.find(x=>x.id===cur);
   if(!file||!f)return;if(f.group||f.ai)return toast('Photos : discussions entre amis seulement');
