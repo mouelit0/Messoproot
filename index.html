@@ -210,9 +210,10 @@ button:active{transform:scale(.94)}
 @keyframes handleBob{0%,100%{transform:translateX(-50%)}50%{transform:translateX(-50%) translateY(-4px)}}
 #sheetHandle{display:none}
 @media (max-width:760px){
-  #sheetHandle{display:grid;align-content:center;justify-items:center;gap:4px;position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:168px;height:52px;padding:8px 0 max(0px,env(safe-area-inset-bottom,0px));border:0;border-radius:50% 50% 0 0/100% 100% 0 0;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 -6px 22px color-mix(in srgb,var(--accent) 45%,transparent);z-index:12;animation:handleBob 2.6s ease-in-out infinite}
-  #sheetHandle i{display:block;width:34px;height:3px;border-radius:3px;background:#fff}
-  #friends{padding-bottom:80px}
+  #sheetHandle{display:grid;align-content:center;justify-items:center;gap:3px;position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:112px;height:34px;padding:5px 0 max(0px,env(safe-area-inset-bottom,0px));border:0;border-radius:50% 50% 0 0/100% 100% 0 0;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 -6px 22px color-mix(in srgb,var(--accent) 45%,transparent);z-index:12;animation:handleBob 2.6s ease-in-out infinite}
+  #sheetHandle i{display:block;width:24px;height:2.5px;border-radius:3px;background:#fff}
+  #friends{padding-bottom:60px}
+  body:has(#app.open) #sheetHandle{display:none}
 }
 </style>
 </head>
@@ -2357,7 +2358,7 @@ function openMenu(f){
 $('addBtn').onclick=openAdd;
 $('grpBtn').onclick=openNewGroup;
 $('logo').onclick=showLaunch;
-const hd=h('button',{'aria-label':'Ouvrir le menu',onclick:showLaunch},h('i'),h('i'),h('i'));hd.id='sheetHandle';hd.type='button';$('side').append(hd);
+const hd=h('button',{'aria-label':'Ouvrir le menu',onclick:showLaunch},h('i'),h('i'),h('i'));hd.id='sheetHandle';hd.type='button';document.body.append(hd);
 function closeSheet(){const L=$('launch');if(L.hidden)return;L.classList.add('closing');setTimeout(()=>{L.hidden=true;L.classList.remove('closing');},220);}
 $('launch').addEventListener('click',e=>{if(e.target===$('launch'))closeSheet();});
 let sheetY=null;
