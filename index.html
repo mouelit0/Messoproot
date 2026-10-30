@@ -1,0 +1,2506 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mesinter</title>
+<meta name="theme-color" content="#7c5cff">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#0d0f14;--side:#12151c;--card:#171b24;--line:#232836;--fg:#eef1f7;--muted:#8891a4;--accent:#7c5cff;--accent2:#5b8cff;--other:#1d2230;--ok:#34d399;--warn:#fbbf24;--bad:#f87171;color-scheme:dark}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f3f4f9;--side:#fff;--card:#fff;--line:#e3e6ee;--fg:#141823;--muted:#6b7385;--other:#eceef5;color-scheme:light}}
+:root[data-theme="light"]{--bg:#f3f4f9;--side:#fff;--card:#fff;--line:#e3e6ee;--fg:#141823;--muted:#6b7385;--other:#eceef5;color-scheme:light}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+button,input,textarea{font:inherit;color:var(--fg)}
+button{background:var(--other);border:1px solid var(--line);border-radius:12px;min-height:40px;padding:0 14px;cursor:pointer;transition:transform .1s,background .2s}
+button:active{transform:scale(.97)}
+button:hover{border-color:var(--accent)}
+button.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#fff;font-weight:600}
+button.ghost{background:transparent;border-color:transparent}
+button:disabled{opacity:.45;cursor:default;transform:none}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;transition:border-color .2s}
+input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+textarea{resize:vertical;min-height:70px;font-size:12px;font-family:ui-monospace,monospace}
+/* iOS zoome automatiquement si la police d'un champ est < 16px : on la fixe à 16px */
+@media (pointer:coarse){input,textarea,select{font-size:16px!important}}
+#app{display:grid;grid-template-columns:340px 1fr;grid-template-rows:minmax(0,1fr);position:fixed;inset:0;height:100%;height:100dvh;overflow:hidden}
+#side,#chat{min-width:0;min-height:0;display:flex;flex-direction:column;height:100%;overflow:hidden}
+#side{background:var(--side);border-right:1px solid var(--line)}
+@media (max-width:760px){
+  #app{grid-template-columns:1fr}
+  #app.open #side{display:none}
+  #app:not(.open) #chat{display:none}
+}
+.top{padding:max(14px,env(safe-area-inset-top,0px)) 16px 12px;display:grid;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#fff;font-weight:800}
+.brand h1{font-size:18px;margin:0;flex:1;letter-spacing:.2px}
+.search{position:relative}
+.search input{padding-left:36px;background:var(--card)}
+.search::before{content:"";position:absolute;left:13px;top:50%;width:12px;height:12px;margin-top:-8px;border:2px solid var(--muted);border-radius:50%}
+#friends{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:4px 8px 16px}
+.sect{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:12px 10px 6px}
+.fr{display:flex;align-items:center;gap:12px;padding:10px;border-radius:14px;cursor:pointer;transition:background .15s}
+.fr:hover{background:var(--card)}
+.fr.on{background:var(--card);box-shadow:inset 3px 0 0 var(--accent)}
+.grow{flex:1;min-width:0}
+.nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{display:grid;justify-items:end;gap:4px;font-size:12px;color:var(--muted)}
+.badge{background:var(--accent);color:#fff;border-radius:999px;min-width:20px;height:20px;padding:0 6px;display:grid;place-items:center;font-size:12px;font-weight:700}
+.av{border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;flex:none;position:relative;text-transform:uppercase}
+.pres{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;border:2px solid var(--side);background:var(--muted)}
+.pres.live{background:var(--ok)}.pres.attente{background:var(--warn)}
+#chat{background:var(--bg)}
+.chead{display:flex;align-items:center;gap:12px;padding:max(12px,env(safe-area-inset-top,0px)) 16px 12px;border-bottom:1px solid var(--line);background:var(--side)}
+.chead .name{font-weight:700;font-size:16px}
+#back{display:none;padding:0 10px}
+@media (max-width:760px){#back{display:inline-flex}}
+#msgs{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:18px 16px;display:flex;flex-direction:column;gap:6px}
+.day{align-self:center;font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:3px 10px;margin:8px 0}
+.bub{max-width:min(78%,520px);padding:9px 13px;border-radius:18px;background:var(--other);align-self:flex-start;word-wrap:break-word;white-space:pre-wrap;animation:pop .18s ease-out}
+.bub.me{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;align-self:flex-end;border-bottom-right-radius:6px}
+.bub:not(.me){border-bottom-left-radius:6px}
+.bub .t{display:flex;gap:6px;justify-content:flex-end;font-size:11px;opacity:.75;margin-top:3px}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+#compose{display:flex;align-items:flex-end;gap:10px;padding:10px 12px max(12px,env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:var(--side)}
+#text{flex:1;min-width:0;border-radius:18px;max-height:140px;min-height:44px;padding:11px 14px;resize:none}
+#send{border-radius:999px;min-width:84px}
+.welcome{margin:auto;text-align:center;display:grid;gap:12px;justify-items:center;padding:24px;max-width:420px}
+.welcome h2{margin:0;font-size:22px}
+.welcome p{margin:0;color:var(--muted)}
+.bigmark{width:72px;height:72px;border-radius:24px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#fff;font-size:30px;font-weight:800}
+#overlay{position:fixed;inset:0;background:rgba(5,7,12,.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+#overlay[hidden]{display:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:20px;width:min(480px,100%);max-height:90vh;overflow:auto;display:grid;gap:12px;box-shadow:0 24px 60px rgba(0,0,0,.4);animation:pop .2s ease-out}
+.card h2{margin:0;font-size:19px}
+.tabs{display:flex;gap:6px;background:var(--bg);padding:4px;border-radius:14px;border:1px solid var(--line)}
+.tabs button{flex:1;border:none;background:transparent;min-height:36px}
+.tabs button.on{background:var(--card);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.muted{color:var(--muted);font-size:13px;margin:0}
+.err{color:var(--bad);font-size:13px;min-height:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grid{display:grid;gap:10px}
+.menu button{width:100%;justify-content:flex-start;min-height:46px}
+.menu button.danger{color:var(--bad)}
+.empty{color:var(--muted);text-align:center;padding:28px 12px}
+hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.qr{display:grid;place-items:center;background:#fff;border-radius:16px;padding:12px;width:min(300px,100%);justify-self:center}
+.qr svg{width:100%;height:auto;display:block}
+.av{transition:transform .2s}
+.fr:hover .av{transform:scale(1.04)}
+.bub{box-shadow:0 1px 2px rgba(0,0,0,.18)}
+.fr{transition:background .15s,transform .1s}
+.fr:active{transform:scale(.99)}
+#launch{position:fixed;inset:0;z-index:15;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:max(24px,env(safe-area-inset-top,0px)) 20px max(24px,env(safe-area-inset-bottom,0px))}
+#launch[hidden]{display:none}
+.lcard{width:min(400px,100%);display:grid;gap:12px;justify-items:center;text-align:center;max-height:100%;overflow:auto}
+.lcard h2{margin:6px 0 0;font-size:24px}
+.lbtns{width:100%;display:grid;gap:10px}
+.lbtns button{min-height:50px;font-size:16px}
+.lbtns button.primary{font-weight:700}
+button.danger{color:var(--bad)}
+#toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:600;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30}
+#toast.show{opacity:1}
+
+/* ---------- Finition visuelle ---------- */
+:root{--glass:rgba(18,21,28,.72);--ring:0 0 0 1px var(--line),0 8px 24px rgba(0,0,0,.18)}
+:root[data-theme="light"]{--glass:rgba(255,255,255,.75)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--glass:rgba(255,255,255,.75)}}
+body{-webkit-font-smoothing:antialiased;letter-spacing:.005em}
+.top{padding-bottom:14px}
+.brand h1{font-size:19px;font-weight:800;letter-spacing:-.01em}
+.logo{box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 35%,transparent)}
+.search input{border-radius:14px;background:var(--bg)}
+.fr{margin:2px 0;padding:11px 12px;border-radius:16px}
+.fr.on{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 14%,transparent),transparent 85%)}
+.fr:hover{background:color-mix(in srgb,var(--accent) 08%,transparent)}
+.nm{font-size:15px;letter-spacing:-.005em}
+.sub{font-size:13px}
+.badge{box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 40%,transparent)}
+.av{box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.chead{background:var(--glass);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);position:sticky;top:0;z-index:2;padding-bottom:12px}
+.chead .name{font-size:16px;letter-spacing:-.01em}
+#msgs{padding:16px 14px 20px;gap:4px;scroll-behavior:smooth}
+.day{position:sticky;top:6px;z-index:1;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:var(--glass);box-shadow:var(--ring)}
+.bub{max-width:min(80%,560px);padding:9px 14px 7px;font-size:15px;line-height:1.42;border-radius:20px;box-shadow:var(--ring)}
+.bub.me{box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 28%,transparent)}
+.bub:not(.me){border-bottom-left-radius:6px}
+.bub.me{border-bottom-right-radius:6px}
+.bub .t{font-size:11px;opacity:.7}
+#compose{background:var(--glass);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-top:1px solid var(--line);padding:10px 12px max(12px,env(safe-area-inset-bottom,0px));gap:8px}
+#text{background:var(--card);border-radius:22px;box-shadow:inset 0 0 0 1px var(--line);padding:11px 16px;min-height:46px}
+#text:focus{box-shadow:inset 0 0 0 1.5px var(--accent)}
+#send{min-height:46px;min-width:0;padding:0 18px;box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 35%,transparent)}
+#send:disabled{box-shadow:none}
+.welcome{padding:32px 24px}
+.welcome h2{font-size:24px;letter-spacing:-.01em}
+button{min-height:42px;border-radius:14px;font-weight:500}
+button.primary{box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 30%,transparent)}
+.card{border-radius:26px;padding:22px}
+.tabs{border-radius:16px}
+#overlay{background:rgba(5,7,12,.55)}
+.lcard h2{font-size:28px;letter-spacing:-.02em}
+.menu button{border-radius:16px}
+#toast{box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.fr,.bub,button,.card{transition-property:background,box-shadow,transform,border-color,color;transition-duration:.18s}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}#msgs{scroll-behavior:auto}}
+@media (max-width:760px){
+  .chead{padding-top:max(10px,env(safe-area-inset-top,0px))}
+  #msgs{padding:12px 12px 16px}
+  .bub{max-width:86%}
+}
+.from{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:2px}
+.pwrap{position:relative;margin-bottom:38px}
+.pbanner{height:112px;border-radius:20px;background-size:cover;background-position:center}
+.pwrap .av{position:absolute;left:16px;bottom:-38px;border:4px solid var(--card)}
+.sw{width:30px;height:30px;min-height:0;padding:0;border-radius:50%}
+.sw.on{outline:2px solid var(--fg);outline-offset:2px}
+.codebig{font:700 30px/1 ui-monospace,monospace;letter-spacing:.22em;text-align:center;padding:18px 8px;border:1px dashed var(--accent);border-radius:18px;cursor:pointer}
+.notice{align-self:center;display:grid;gap:8px;justify-items:center;text-align:center;color:var(--muted);font-size:13px;padding:10px}
+#chPeer{cursor:pointer}
+.bub.typing{display:flex;gap:4px;padding:12px 14px;width:max-content}
+.bub.typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:bl 1s infinite}
+.bub.typing i:nth-child(2){animation-delay:.15s}.bub.typing i:nth-child(3){animation-delay:.3s}
+@keyframes bl{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+.bub img{display:block;max-width:100%;max-height:300px;border-radius:12px}
+#pic{min-width:44px;padding:0}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div class="top">
+      <div class="brand">
+        <div class="logo" id="logo" style="cursor:pointer" title="Accueil">M</div>
+        <h1>Mesinter</h1>
+        <button id="addBtn" class="primary">+ Ami</button>
+      </div>
+      <div class="search"><input id="q" type="search" placeholder="Rechercher un ami" autocomplete="off"></div>
+      <button id="grpBtn" class="ghost" style="min-height:38px">+ Créer un groupe</button>
+    </div>
+    <div id="friends"></div>
+    <div class="row" style="padding:10px 16px;border-top:1px solid var(--line)">
+      <button id="profileBtn" class="ghost" style="flex:1;justify-content:flex-start;min-height:44px">Mon profil</button>
+    </div>
+    <div class="row" style="padding:0 16px 14px;gap:8px">
+      <button id="fsBtn" class="ghost" style="flex:1;min-height:44px">Plein écran</button>
+      <button id="quitBtn" class="ghost" style="flex:1;min-height:44px">Quitter</button>
+    </div>
+  </aside>
+  <section id="chat">
+    <div class="chead" id="chead" hidden>
+      <button id="back" class="ghost" aria-label="Retour">←</button>
+      <div id="chPeer" class="row grow" style="flex-wrap:nowrap"></div>
+      <button id="callBtn" class="ghost" aria-label="Appeler" hidden>📞</button>
+      <button id="menuBtn" class="ghost" aria-label="Options">⋯</button>
+    </div>
+    <div id="msgs"></div>
+    <form id="compose">
+      <button id="pic" type="button" class="ghost" aria-label="Photo ou GIF">📷</button><input id="picIn" type="file" accept="image/*" hidden>
+      <textarea id="text" rows="1" placeholder="Écrire un message" disabled></textarea>
+      <button id="send" class="primary" type="submit" disabled>Envoyer</button>
+    </form>
+  </section>
+</div>
+<div id="launch" hidden></div>
+<div id="overlay" hidden><div class="card" id="card"></div></div>
+<div id="toast"></div>
+
+<script>
+/* QRCode for JavaScript, Kazuhiko Arase, licence MIT (https://www.opensource.org/licenses/mit-license.php) */
+var QRLib=(function(){
+ var defs={},cache={};
+ function req(n){
+  n=n.replace(/^\.\//,"");
+  if(cache[n])return cache[n].exports;
+  var module={exports:{}};cache[n]=module;
+  defs[n](module,module.exports,req);
+  return module.exports;
+ }
+ defs["QR8bitByte"]=function(module,exports,require){
+var QRMode = require('./QRMode');
+
+function QR8bitByte(data) {
+	this.mode = QRMode.MODE_8BIT_BYTE;
+	this.data = data;
+}
+
+QR8bitByte.prototype = {
+
+	getLength : function() {
+		return this.data.length;
+	},
+	
+	write : function(buffer) {
+		for (var i = 0; i < this.data.length; i++) {
+			// not JIS ...
+			buffer.put(this.data.charCodeAt(i), 8);
+		}
+	}
+};
+
+module.exports = QR8bitByte;
+
+ };
+ defs["QRBitBuffer"]=function(module,exports,require){
+function QRBitBuffer() {
+	this.buffer = [];
+	this.length = 0;
+}
+
+QRBitBuffer.prototype = {
+
+	get : function(index) {
+		var bufIndex = Math.floor(index / 8);
+		return ( (this.buffer[bufIndex] >>> (7 - index % 8) ) & 1) == 1;
+	},
+	
+	put : function(num, length) {
+		for (var i = 0; i < length; i++) {
+			this.putBit( ( (num >>> (length - i - 1) ) & 1) == 1);
+		}
+	},
+	
+	getLengthInBits : function() {
+		return this.length;
+	},
+	
+	putBit : function(bit) {
+	
+		var bufIndex = Math.floor(this.length / 8);
+		if (this.buffer.length <= bufIndex) {
+			this.buffer.push(0);
+		}
+	
+		if (bit) {
+			this.buffer[bufIndex] |= (0x80 >>> (this.length % 8) );
+		}
+	
+		this.length++;
+	}
+};
+
+module.exports = QRBitBuffer;
+
+ };
+ defs["QRErrorCorrectLevel"]=function(module,exports,require){
+module.exports = {
+	L : 1,
+	M : 0,
+	Q : 3,
+	H : 2
+};
+
+
+ };
+ defs["QRMaskPattern"]=function(module,exports,require){
+module.exports = {
+	PATTERN000 : 0,
+	PATTERN001 : 1,
+	PATTERN010 : 2,
+	PATTERN011 : 3,
+	PATTERN100 : 4,
+	PATTERN101 : 5,
+	PATTERN110 : 6,
+	PATTERN111 : 7
+};
+
+ };
+ defs["QRMath"]=function(module,exports,require){
+var QRMath = {
+
+	glog : function(n) {
+	
+		if (n < 1) {
+			throw new Error("glog(" + n + ")");
+		}
+		
+		return QRMath.LOG_TABLE[n];
+	},
+	
+	gexp : function(n) {
+	
+		while (n < 0) {
+			n += 255;
+		}
+	
+		while (n >= 256) {
+			n -= 255;
+		}
+	
+		return QRMath.EXP_TABLE[n];
+	},
+	
+	EXP_TABLE : new Array(256),
+	
+	LOG_TABLE : new Array(256)
+
+};
+	
+for (var i = 0; i < 8; i++) {
+	QRMath.EXP_TABLE[i] = 1 << i;
+}
+for (var i = 8; i < 256; i++) {
+	QRMath.EXP_TABLE[i] = QRMath.EXP_TABLE[i - 4]
+		^ QRMath.EXP_TABLE[i - 5]
+		^ QRMath.EXP_TABLE[i - 6]
+		^ QRMath.EXP_TABLE[i - 8];
+}
+for (var i = 0; i < 255; i++) {
+	QRMath.LOG_TABLE[QRMath.EXP_TABLE[i] ] = i;
+}
+
+module.exports = QRMath;
+
+ };
+ defs["QRMode"]=function(module,exports,require){
+module.exports = {
+    MODE_NUMBER :       1 << 0,
+    MODE_ALPHA_NUM :    1 << 1,
+    MODE_8BIT_BYTE :    1 << 2,
+    MODE_KANJI :        1 << 3
+};
+
+ };
+ defs["QRPolynomial"]=function(module,exports,require){
+var QRMath = require('./QRMath');
+
+function QRPolynomial(num, shift) {
+	if (num.length === undefined) {
+		throw new Error(num.length + "/" + shift);
+	}
+
+	var offset = 0;
+
+	while (offset < num.length && num[offset] === 0) {
+		offset++;
+	}
+
+	this.num = new Array(num.length - offset + shift);
+	for (var i = 0; i < num.length - offset; i++) {
+		this.num[i] = num[i + offset];
+	}
+}
+
+QRPolynomial.prototype = {
+
+	get : function(index) {
+		return this.num[index];
+	},
+	
+	getLength : function() {
+		return this.num.length;
+	},
+	
+	multiply : function(e) {
+	
+		var num = new Array(this.getLength() + e.getLength() - 1);
+	
+		for (var i = 0; i < this.getLength(); i++) {
+			for (var j = 0; j < e.getLength(); j++) {
+				num[i + j] ^= QRMath.gexp(QRMath.glog(this.get(i) ) + QRMath.glog(e.get(j) ) );
+			}
+		}
+	
+		return new QRPolynomial(num, 0);
+	},
+	
+	mod : function(e) {
+	
+		if (this.getLength() - e.getLength() < 0) {
+			return this;
+		}
+	
+		var ratio = QRMath.glog(this.get(0) ) - QRMath.glog(e.get(0) );
+	
+		var num = new Array(this.getLength() );
+		
+		for (var i = 0; i < this.getLength(); i++) {
+			num[i] = this.get(i);
+		}
+		
+		for (var x = 0; x < e.getLength(); x++) {
+			num[x] ^= QRMath.gexp(QRMath.glog(e.get(x) ) + ratio);
+		}
+	
+		// recursive call
+		return new QRPolynomial(num, 0).mod(e);
+	}
+};
+
+module.exports = QRPolynomial;
+
+ };
+ defs["QRRSBlock"]=function(module,exports,require){
+var QRErrorCorrectLevel = require('./QRErrorCorrectLevel');
+
+function QRRSBlock(totalCount, dataCount) {
+	this.totalCount = totalCount;
+	this.dataCount  = dataCount;
+}
+
+QRRSBlock.RS_BLOCK_TABLE = [
+
+	// L
+	// M
+	// Q
+	// H
+
+	// 1
+	[1, 26, 19],
+	[1, 26, 16],
+	[1, 26, 13],
+	[1, 26, 9],
+	
+	// 2
+	[1, 44, 34],
+	[1, 44, 28],
+	[1, 44, 22],
+	[1, 44, 16],
+
+	// 3
+	[1, 70, 55],
+	[1, 70, 44],
+	[2, 35, 17],
+	[2, 35, 13],
+
+	// 4		
+	[1, 100, 80],
+	[2, 50, 32],
+	[2, 50, 24],
+	[4, 25, 9],
+	
+	// 5
+	[1, 134, 108],
+	[2, 67, 43],
+	[2, 33, 15, 2, 34, 16],
+	[2, 33, 11, 2, 34, 12],
+	
+	// 6
+	[2, 86, 68],
+	[4, 43, 27],
+	[4, 43, 19],
+	[4, 43, 15],
+	
+	// 7		
+	[2, 98, 78],
+	[4, 49, 31],
+	[2, 32, 14, 4, 33, 15],
+	[4, 39, 13, 1, 40, 14],
+	
+	// 8
+	[2, 121, 97],
+	[2, 60, 38, 2, 61, 39],
+	[4, 40, 18, 2, 41, 19],
+	[4, 40, 14, 2, 41, 15],
+	
+	// 9
+	[2, 146, 116],
+	[3, 58, 36, 2, 59, 37],
+	[4, 36, 16, 4, 37, 17],
+	[4, 36, 12, 4, 37, 13],
+	
+	// 10		
+	[2, 86, 68, 2, 87, 69],
+	[4, 69, 43, 1, 70, 44],
+	[6, 43, 19, 2, 44, 20],
+	[6, 43, 15, 2, 44, 16],
+
+	// 11
+	[4, 101, 81],
+	[1, 80, 50, 4, 81, 51],
+	[4, 50, 22, 4, 51, 23],
+	[3, 36, 12, 8, 37, 13],
+
+	// 12
+	[2, 116, 92, 2, 117, 93],
+	[6, 58, 36, 2, 59, 37],
+	[4, 46, 20, 6, 47, 21],
+	[7, 42, 14, 4, 43, 15],
+
+	// 13
+	[4, 133, 107],
+	[8, 59, 37, 1, 60, 38],
+	[8, 44, 20, 4, 45, 21],
+	[12, 33, 11, 4, 34, 12],
+
+	// 14
+	[3, 145, 115, 1, 146, 116],
+	[4, 64, 40, 5, 65, 41],
+	[11, 36, 16, 5, 37, 17],
+	[11, 36, 12, 5, 37, 13],
+
+	// 15
+	[5, 109, 87, 1, 110, 88],
+	[5, 65, 41, 5, 66, 42],
+	[5, 54, 24, 7, 55, 25],
+	[11, 36, 12],
+
+	// 16
+	[5, 122, 98, 1, 123, 99],
+	[7, 73, 45, 3, 74, 46],
+	[15, 43, 19, 2, 44, 20],
+	[3, 45, 15, 13, 46, 16],
+
+	// 17
+	[1, 135, 107, 5, 136, 108],
+	[10, 74, 46, 1, 75, 47],
+	[1, 50, 22, 15, 51, 23],
+	[2, 42, 14, 17, 43, 15],
+
+	// 18
+	[5, 150, 120, 1, 151, 121],
+	[9, 69, 43, 4, 70, 44],
+	[17, 50, 22, 1, 51, 23],
+	[2, 42, 14, 19, 43, 15],
+
+	// 19
+	[3, 141, 113, 4, 142, 114],
+	[3, 70, 44, 11, 71, 45],
+	[17, 47, 21, 4, 48, 22],
+	[9, 39, 13, 16, 40, 14],
+
+	// 20
+	[3, 135, 107, 5, 136, 108],
+	[3, 67, 41, 13, 68, 42],
+	[15, 54, 24, 5, 55, 25],
+	[15, 43, 15, 10, 44, 16],
+
+	// 21
+	[4, 144, 116, 4, 145, 117],
+	[17, 68, 42],
+	[17, 50, 22, 6, 51, 23],
+	[19, 46, 16, 6, 47, 17],
+
+	// 22
+	[2, 139, 111, 7, 140, 112],
+	[17, 74, 46],
+	[7, 54, 24, 16, 55, 25],
+	[34, 37, 13],
+
+	// 23
+	[4, 151, 121, 5, 152, 122],
+	[4, 75, 47, 14, 76, 48],
+	[11, 54, 24, 14, 55, 25],
+	[16, 45, 15, 14, 46, 16],
+
+	// 24
+	[6, 147, 117, 4, 148, 118],
+	[6, 73, 45, 14, 74, 46],
+	[11, 54, 24, 16, 55, 25],
+	[30, 46, 16, 2, 47, 17],
+
+	// 25
+	[8, 132, 106, 4, 133, 107],
+	[8, 75, 47, 13, 76, 48],
+	[7, 54, 24, 22, 55, 25],
+	[22, 45, 15, 13, 46, 16],
+
+	// 26
+	[10, 142, 114, 2, 143, 115],
+	[19, 74, 46, 4, 75, 47],
+	[28, 50, 22, 6, 51, 23],
+	[33, 46, 16, 4, 47, 17],
+
+	// 27
+	[8, 152, 122, 4, 153, 123],
+	[22, 73, 45, 3, 74, 46],
+	[8, 53, 23, 26, 54, 24],
+	[12, 45, 15, 28, 46, 16],
+
+	// 28
+	[3, 147, 117, 10, 148, 118],
+	[3, 73, 45, 23, 74, 46],
+	[4, 54, 24, 31, 55, 25],
+	[11, 45, 15, 31, 46, 16],
+
+	// 29
+	[7, 146, 116, 7, 147, 117],
+	[21, 73, 45, 7, 74, 46],
+	[1, 53, 23, 37, 54, 24],
+	[19, 45, 15, 26, 46, 16],
+
+	// 30
+	[5, 145, 115, 10, 146, 116],
+	[19, 75, 47, 10, 76, 48],
+	[15, 54, 24, 25, 55, 25],
+	[23, 45, 15, 25, 46, 16],
+
+	// 31
+	[13, 145, 115, 3, 146, 116],
+	[2, 74, 46, 29, 75, 47],
+	[42, 54, 24, 1, 55, 25],
+	[23, 45, 15, 28, 46, 16],
+
+	// 32
+	[17, 145, 115],
+	[10, 74, 46, 23, 75, 47],
+	[10, 54, 24, 35, 55, 25],
+	[19, 45, 15, 35, 46, 16],
+
+	// 33
+	[17, 145, 115, 1, 146, 116],
+	[14, 74, 46, 21, 75, 47],
+	[29, 54, 24, 19, 55, 25],
+	[11, 45, 15, 46, 46, 16],
+
+	// 34
+	[13, 145, 115, 6, 146, 116],
+	[14, 74, 46, 23, 75, 47],
+	[44, 54, 24, 7, 55, 25],
+	[59, 46, 16, 1, 47, 17],
+
+	// 35
+	[12, 151, 121, 7, 152, 122],
+	[12, 75, 47, 26, 76, 48],
+	[39, 54, 24, 14, 55, 25],
+	[22, 45, 15, 41, 46, 16],
+
+	// 36
+	[6, 151, 121, 14, 152, 122],
+	[6, 75, 47, 34, 76, 48],
+	[46, 54, 24, 10, 55, 25],
+	[2, 45, 15, 64, 46, 16],
+
+	// 37
+	[17, 152, 122, 4, 153, 123],
+	[29, 74, 46, 14, 75, 47],
+	[49, 54, 24, 10, 55, 25],
+	[24, 45, 15, 46, 46, 16],
+
+	// 38
+	[4, 152, 122, 18, 153, 123],
+	[13, 74, 46, 32, 75, 47],
+	[48, 54, 24, 14, 55, 25],
+	[42, 45, 15, 32, 46, 16],
+
+	// 39
+	[20, 147, 117, 4, 148, 118],
+	[40, 75, 47, 7, 76, 48],
+	[43, 54, 24, 22, 55, 25],
+	[10, 45, 15, 67, 46, 16],
+
+	// 40
+	[19, 148, 118, 6, 149, 119],
+	[18, 75, 47, 31, 76, 48],
+	[34, 54, 24, 34, 55, 25],
+	[20, 45, 15, 61, 46, 16]
+];
+
+QRRSBlock.getRSBlocks = function(typeNumber, errorCorrectLevel) {
+	
+	var rsBlock = QRRSBlock.getRsBlockTable(typeNumber, errorCorrectLevel);
+	
+	if (rsBlock === undefined) {
+		throw new Error("bad rs block @ typeNumber:" + typeNumber + "/errorCorrectLevel:" + errorCorrectLevel);
+	}
+
+	var length = rsBlock.length / 3;
+	
+	var list = [];
+	
+	for (var i = 0; i < length; i++) {
+
+		var count = rsBlock[i * 3 + 0];
+		var totalCount = rsBlock[i * 3 + 1];
+		var dataCount  = rsBlock[i * 3 + 2];
+
+		for (var j = 0; j < count; j++) {
+			list.push(new QRRSBlock(totalCount, dataCount) );	
+		}
+	}
+	
+	return list;
+};
+
+QRRSBlock.getRsBlockTable = function(typeNumber, errorCorrectLevel) {
+
+	switch(errorCorrectLevel) {
+	case QRErrorCorrectLevel.L :
+		return QRRSBlock.RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 0];
+	case QRErrorCorrectLevel.M :
+		return QRRSBlock.RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 1];
+	case QRErrorCorrectLevel.Q :
+		return QRRSBlock.RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 2];
+	case QRErrorCorrectLevel.H :
+		return QRRSBlock.RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 3];
+	default :
+		return undefined;
+	}
+};
+
+module.exports = QRRSBlock;
+
+ };
+ defs["QRUtil"]=function(module,exports,require){
+var QRMode = require('./QRMode');
+var QRPolynomial = require('./QRPolynomial');
+var QRMath = require('./QRMath');
+var QRMaskPattern = require('./QRMaskPattern');
+
+var QRUtil = {
+
+    PATTERN_POSITION_TABLE : [
+        [],
+        [6, 18],
+        [6, 22],
+        [6, 26],
+        [6, 30],
+        [6, 34],
+        [6, 22, 38],
+        [6, 24, 42],
+        [6, 26, 46],
+        [6, 28, 50],
+        [6, 30, 54],        
+        [6, 32, 58],
+        [6, 34, 62],
+        [6, 26, 46, 66],
+        [6, 26, 48, 70],
+        [6, 26, 50, 74],
+        [6, 30, 54, 78],
+        [6, 30, 56, 82],
+        [6, 30, 58, 86],
+        [6, 34, 62, 90],
+        [6, 28, 50, 72, 94],
+        [6, 26, 50, 74, 98],
+        [6, 30, 54, 78, 102],
+        [6, 28, 54, 80, 106],
+        [6, 32, 58, 84, 110],
+        [6, 30, 58, 86, 114],
+        [6, 34, 62, 90, 118],
+        [6, 26, 50, 74, 98, 122],
+        [6, 30, 54, 78, 102, 126],
+        [6, 26, 52, 78, 104, 130],
+        [6, 30, 56, 82, 108, 134],
+        [6, 34, 60, 86, 112, 138],
+        [6, 30, 58, 86, 114, 142],
+        [6, 34, 62, 90, 118, 146],
+        [6, 30, 54, 78, 102, 126, 150],
+        [6, 24, 50, 76, 102, 128, 154],
+        [6, 28, 54, 80, 106, 132, 158],
+        [6, 32, 58, 84, 110, 136, 162],
+        [6, 26, 54, 82, 110, 138, 166],
+        [6, 30, 58, 86, 114, 142, 170]
+    ],
+
+    G15 : (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0),
+    G18 : (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0),
+    G15_MASK : (1 << 14) | (1 << 12) | (1 << 10)    | (1 << 4) | (1 << 1),
+
+    getBCHTypeInfo : function(data) {
+        var d = data << 10;
+        while (QRUtil.getBCHDigit(d) - QRUtil.getBCHDigit(QRUtil.G15) >= 0) {
+            d ^= (QRUtil.G15 << (QRUtil.getBCHDigit(d) - QRUtil.getBCHDigit(QRUtil.G15) ) );    
+        }
+        return ( (data << 10) | d) ^ QRUtil.G15_MASK;
+    },
+
+    getBCHTypeNumber : function(data) {
+        var d = data << 12;
+        while (QRUtil.getBCHDigit(d) - QRUtil.getBCHDigit(QRUtil.G18) >= 0) {
+            d ^= (QRUtil.G18 << (QRUtil.getBCHDigit(d) - QRUtil.getBCHDigit(QRUtil.G18) ) );    
+        }
+        return (data << 12) | d;
+    },
+
+    getBCHDigit : function(data) {
+
+        var digit = 0;
+
+        while (data !== 0) {
+            digit++;
+            data >>>= 1;
+        }
+
+        return digit;
+    },
+
+    getPatternPosition : function(typeNumber) {
+        return QRUtil.PATTERN_POSITION_TABLE[typeNumber - 1];
+    },
+
+    getMask : function(maskPattern, i, j) {
+        
+        switch (maskPattern) {
+            
+        case QRMaskPattern.PATTERN000 : return (i + j) % 2 === 0;
+        case QRMaskPattern.PATTERN001 : return i % 2 === 0;
+        case QRMaskPattern.PATTERN010 : return j % 3 === 0;
+        case QRMaskPattern.PATTERN011 : return (i + j) % 3 === 0;
+        case QRMaskPattern.PATTERN100 : return (Math.floor(i / 2) + Math.floor(j / 3) ) % 2 === 0;
+        case QRMaskPattern.PATTERN101 : return (i * j) % 2 + (i * j) % 3 === 0;
+        case QRMaskPattern.PATTERN110 : return ( (i * j) % 2 + (i * j) % 3) % 2 === 0;
+        case QRMaskPattern.PATTERN111 : return ( (i * j) % 3 + (i + j) % 2) % 2 === 0;
+
+        default :
+            throw new Error("bad maskPattern:" + maskPattern);
+        }
+    },
+
+    getErrorCorrectPolynomial : function(errorCorrectLength) {
+
+        var a = new QRPolynomial([1], 0);
+
+        for (var i = 0; i < errorCorrectLength; i++) {
+            a = a.multiply(new QRPolynomial([1, QRMath.gexp(i)], 0) );
+        }
+
+        return a;
+    },
+
+    getLengthInBits : function(mode, type) {
+
+        if (1 <= type && type < 10) {
+
+            // 1 - 9
+
+            switch(mode) {
+            case QRMode.MODE_NUMBER     : return 10;
+            case QRMode.MODE_ALPHA_NUM  : return 9;
+            case QRMode.MODE_8BIT_BYTE  : return 8;
+            case QRMode.MODE_KANJI      : return 8;
+            default :
+                throw new Error("mode:" + mode);
+            }
+
+        } else if (type < 27) {
+
+            // 10 - 26
+
+            switch(mode) {
+            case QRMode.MODE_NUMBER     : return 12;
+            case QRMode.MODE_ALPHA_NUM  : return 11;
+            case QRMode.MODE_8BIT_BYTE  : return 16;
+            case QRMode.MODE_KANJI      : return 10;
+            default :
+                throw new Error("mode:" + mode);
+            }
+
+        } else if (type < 41) {
+
+            // 27 - 40
+
+            switch(mode) {
+            case QRMode.MODE_NUMBER     : return 14;
+            case QRMode.MODE_ALPHA_NUM  : return 13;
+            case QRMode.MODE_8BIT_BYTE  : return 16;
+            case QRMode.MODE_KANJI      : return 12;
+            default :
+                throw new Error("mode:" + mode);
+            }
+
+        } else {
+            throw new Error("type:" + type);
+        }
+    },
+
+    getLostPoint : function(qrCode) {
+        
+        var moduleCount = qrCode.getModuleCount();
+        var lostPoint = 0;
+        var row = 0; 
+        var col = 0;
+
+        
+        // LEVEL1
+        
+        for (row = 0; row < moduleCount; row++) {
+
+            for (col = 0; col < moduleCount; col++) {
+
+                var sameCount = 0;
+                var dark = qrCode.isDark(row, col);
+
+                for (var r = -1; r <= 1; r++) {
+
+                    if (row + r < 0 || moduleCount <= row + r) {
+                        continue;
+                    }
+
+                    for (var c = -1; c <= 1; c++) {
+
+                        if (col + c < 0 || moduleCount <= col + c) {
+                            continue;
+                        }
+
+                        if (r === 0 && c === 0) {
+                            continue;
+                        }
+
+                        if (dark === qrCode.isDark(row + r, col + c) ) {
+                            sameCount++;
+                        }
+                    }
+                }
+
+                if (sameCount > 5) {
+                    lostPoint += (3 + sameCount - 5);
+                }
+            }
+        }
+
+        // LEVEL2
+
+        for (row = 0; row < moduleCount - 1; row++) {
+            for (col = 0; col < moduleCount - 1; col++) {
+                var count = 0;
+                if (qrCode.isDark(row,     col    ) ) count++;
+                if (qrCode.isDark(row + 1, col    ) ) count++;
+                if (qrCode.isDark(row,     col + 1) ) count++;
+                if (qrCode.isDark(row + 1, col + 1) ) count++;
+                if (count === 0 || count === 4) {
+                    lostPoint += 3;
+                }
+            }
+        }
+
+        // LEVEL3
+
+        for (row = 0; row < moduleCount; row++) {
+            for (col = 0; col < moduleCount - 6; col++) {
+                if (qrCode.isDark(row, col) && 
+                        !qrCode.isDark(row, col + 1) && 
+                         qrCode.isDark(row, col + 2) && 
+                         qrCode.isDark(row, col + 3) && 
+                         qrCode.isDark(row, col + 4) && 
+                        !qrCode.isDark(row, col + 5) && 
+                         qrCode.isDark(row, col + 6) ) {
+                    lostPoint += 40;
+                }
+            }
+        }
+
+        for (col = 0; col < moduleCount; col++) {
+            for (row = 0; row < moduleCount - 6; row++) {
+                if (qrCode.isDark(row, col) &&
+                        !qrCode.isDark(row + 1, col) &&
+                         qrCode.isDark(row + 2, col) &&
+                         qrCode.isDark(row + 3, col) &&
+                         qrCode.isDark(row + 4, col) &&
+                        !qrCode.isDark(row + 5, col) &&
+                         qrCode.isDark(row + 6, col) ) {
+                    lostPoint += 40;
+                }
+            }
+        }
+
+        // LEVEL4
+        
+        var darkCount = 0;
+
+        for (col = 0; col < moduleCount; col++) {
+            for (row = 0; row < moduleCount; row++) {
+                if (qrCode.isDark(row, col) ) {
+                    darkCount++;
+                }
+            }
+        }
+        
+        var ratio = Math.abs(100 * darkCount / moduleCount / moduleCount - 50) / 5;
+        lostPoint += ratio * 10;
+
+        return lostPoint;       
+    }
+
+};
+
+module.exports = QRUtil;
+
+ };
+ defs["index"]=function(module,exports,require){
+//---------------------------------------------------------------------
+// QRCode for JavaScript
+//
+// Copyright (c) 2009 Kazuhiko Arase
+//
+// URL: http://www.d-project.com/
+//
+// Licensed under the MIT license:
+//   http://www.opensource.org/licenses/mit-license.php
+//
+// The word "QR Code" is registered trademark of 
+// DENSO WAVE INCORPORATED
+//   http://www.denso-wave.com/qrcode/faqpatent-e.html
+//
+//---------------------------------------------------------------------
+// Modified to work in node for this project (and some refactoring)
+//---------------------------------------------------------------------
+
+var QR8bitByte = require('./QR8bitByte');
+var QRUtil = require('./QRUtil');
+var QRPolynomial = require('./QRPolynomial');
+var QRRSBlock = require('./QRRSBlock');
+var QRBitBuffer = require('./QRBitBuffer');
+
+function QRCode(typeNumber, errorCorrectLevel) {
+	this.typeNumber = typeNumber;
+	this.errorCorrectLevel = errorCorrectLevel;
+	this.modules = null;
+	this.moduleCount = 0;
+	this.dataCache = null;
+	this.dataList = [];
+}
+
+QRCode.prototype = {
+	
+	addData : function(data) {
+		var newData = new QR8bitByte(data);
+		this.dataList.push(newData);
+		this.dataCache = null;
+	},
+	
+	isDark : function(row, col) {
+		if (row < 0 || this.moduleCount <= row || col < 0 || this.moduleCount <= col) {
+			throw new Error(row + "," + col);
+		}
+		return this.modules[row][col];
+	},
+
+	getModuleCount : function() {
+		return this.moduleCount;
+	},
+	
+	make : function() {
+		// Calculate automatically typeNumber if provided is < 1
+		if (this.typeNumber < 1 ){
+			var typeNumber = 1;
+			for (typeNumber = 1; typeNumber < 40; typeNumber++) {
+				var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, this.errorCorrectLevel);
+
+				var buffer = new QRBitBuffer();
+				var totalDataCount = 0;
+				for (var i = 0; i < rsBlocks.length; i++) {
+					totalDataCount += rsBlocks[i].dataCount;
+				}
+
+				for (var x = 0; x < this.dataList.length; x++) {
+					var data = this.dataList[x];
+					buffer.put(data.mode, 4);
+					buffer.put(data.getLength(), QRUtil.getLengthInBits(data.mode, typeNumber) );
+					data.write(buffer);
+				}
+				if (buffer.getLengthInBits() <= totalDataCount * 8)
+					break;
+			}
+			this.typeNumber = typeNumber;
+		}
+		this.makeImpl(false, this.getBestMaskPattern() );
+	},
+	
+	makeImpl : function(test, maskPattern) {
+		
+		this.moduleCount = this.typeNumber * 4 + 17;
+		this.modules = new Array(this.moduleCount);
+		
+		for (var row = 0; row < this.moduleCount; row++) {
+			
+			this.modules[row] = new Array(this.moduleCount);
+			
+			for (var col = 0; col < this.moduleCount; col++) {
+				this.modules[row][col] = null;//(col + row) % 3;
+			}
+		}
+	
+		this.setupPositionProbePattern(0, 0);
+		this.setupPositionProbePattern(this.moduleCount - 7, 0);
+		this.setupPositionProbePattern(0, this.moduleCount - 7);
+		this.setupPositionAdjustPattern();
+		this.setupTimingPattern();
+		this.setupTypeInfo(test, maskPattern);
+		
+		if (this.typeNumber >= 7) {
+			this.setupTypeNumber(test);
+		}
+	
+		if (this.dataCache === null) {
+			this.dataCache = QRCode.createData(this.typeNumber, this.errorCorrectLevel, this.dataList);
+		}
+	
+		this.mapData(this.dataCache, maskPattern);
+	},
+
+	setupPositionProbePattern : function(row, col)  {
+		
+		for (var r = -1; r <= 7; r++) {
+			
+			if (row + r <= -1 || this.moduleCount <= row + r) continue;
+			
+			for (var c = -1; c <= 7; c++) {
+				
+				if (col + c <= -1 || this.moduleCount <= col + c) continue;
+				
+				if ( (0 <= r && r <= 6 && (c === 0 || c === 6) ) || 
+                     (0 <= c && c <= 6 && (r === 0 || r === 6) ) || 
+                     (2 <= r && r <= 4 && 2 <= c && c <= 4) ) {
+					this.modules[row + r][col + c] = true;
+				} else {
+					this.modules[row + r][col + c] = false;
+				}
+			}		
+		}		
+	},
+	
+	getBestMaskPattern : function() {
+	
+		var minLostPoint = 0;
+		var pattern = 0;
+	
+		for (var i = 0; i < 8; i++) {
+			
+			this.makeImpl(true, i);
+	
+			var lostPoint = QRUtil.getLostPoint(this);
+	
+			if (i === 0 || minLostPoint >  lostPoint) {
+				minLostPoint = lostPoint;
+				pattern = i;
+			}
+		}
+	
+		return pattern;
+	},
+	
+	createMovieClip : function(target_mc, instance_name, depth) {
+	
+		var qr_mc = target_mc.createEmptyMovieClip(instance_name, depth);
+		var cs = 1;
+	
+		this.make();
+
+		for (var row = 0; row < this.modules.length; row++) {
+			
+			var y = row * cs;
+			
+			for (var col = 0; col < this.modules[row].length; col++) {
+	
+				var x = col * cs;
+				var dark = this.modules[row][col];
+			
+				if (dark) {
+					qr_mc.beginFill(0, 100);
+					qr_mc.moveTo(x, y);
+					qr_mc.lineTo(x + cs, y);
+					qr_mc.lineTo(x + cs, y + cs);
+					qr_mc.lineTo(x, y + cs);
+					qr_mc.endFill();
+				}
+			}
+		}
+		
+		return qr_mc;
+	},
+
+	setupTimingPattern : function() {
+		
+		for (var r = 8; r < this.moduleCount - 8; r++) {
+			if (this.modules[r][6] !== null) {
+				continue;
+			}
+			this.modules[r][6] = (r % 2 === 0);
+		}
+	
+		for (var c = 8; c < this.moduleCount - 8; c++) {
+			if (this.modules[6][c] !== null) {
+				continue;
+			}
+			this.modules[6][c] = (c % 2 === 0);
+		}
+	},
+	
+	setupPositionAdjustPattern : function() {
+	
+		var pos = QRUtil.getPatternPosition(this.typeNumber);
+		
+		for (var i = 0; i < pos.length; i++) {
+		
+			for (var j = 0; j < pos.length; j++) {
+			
+				var row = pos[i];
+				var col = pos[j];
+				
+				if (this.modules[row][col] !== null) {
+					continue;
+				}
+				
+				for (var r = -2; r <= 2; r++) {
+				
+					for (var c = -2; c <= 2; c++) {
+					
+						if (Math.abs(r) === 2 || 
+                            Math.abs(c) === 2 ||
+                            (r === 0 && c === 0) ) {
+							this.modules[row + r][col + c] = true;
+						} else {
+							this.modules[row + r][col + c] = false;
+						}
+					}
+				}
+			}
+		}
+	},
+	
+	setupTypeNumber : function(test) {
+	
+		var bits = QRUtil.getBCHTypeNumber(this.typeNumber);
+        var mod;
+	
+		for (var i = 0; i < 18; i++) {
+			mod = (!test && ( (bits >> i) & 1) === 1);
+			this.modules[Math.floor(i / 3)][i % 3 + this.moduleCount - 8 - 3] = mod;
+		}
+	
+		for (var x = 0; x < 18; x++) {
+			mod = (!test && ( (bits >> x) & 1) === 1);
+			this.modules[x % 3 + this.moduleCount - 8 - 3][Math.floor(x / 3)] = mod;
+		}
+	},
+	
+	setupTypeInfo : function(test, maskPattern) {
+	
+		var data = (this.errorCorrectLevel << 3) | maskPattern;
+		var bits = QRUtil.getBCHTypeInfo(data);
+        var mod;
+	
+		// vertical		
+		for (var v = 0; v < 15; v++) {
+	
+			mod = (!test && ( (bits >> v) & 1) === 1);
+	
+			if (v < 6) {
+				this.modules[v][8] = mod;
+			} else if (v < 8) {
+				this.modules[v + 1][8] = mod;
+			} else {
+				this.modules[this.moduleCount - 15 + v][8] = mod;
+			}
+		}
+	
+		// horizontal
+		for (var h = 0; h < 15; h++) {
+	
+			mod = (!test && ( (bits >> h) & 1) === 1);
+			
+			if (h < 8) {
+				this.modules[8][this.moduleCount - h - 1] = mod;
+			} else if (h < 9) {
+				this.modules[8][15 - h - 1 + 1] = mod;
+			} else {
+				this.modules[8][15 - h - 1] = mod;
+			}
+		}
+	
+		// fixed module
+		this.modules[this.moduleCount - 8][8] = (!test);
+	
+	},
+	
+	mapData : function(data, maskPattern) {
+		
+		var inc = -1;
+		var row = this.moduleCount - 1;
+		var bitIndex = 7;
+		var byteIndex = 0;
+		
+		for (var col = this.moduleCount - 1; col > 0; col -= 2) {
+	
+			if (col === 6) col--;
+	
+			while (true) {
+	
+				for (var c = 0; c < 2; c++) {
+					
+					if (this.modules[row][col - c] === null) {
+						
+						var dark = false;
+	
+						if (byteIndex < data.length) {
+							dark = ( ( (data[byteIndex] >>> bitIndex) & 1) === 1);
+						}
+	
+						var mask = QRUtil.getMask(maskPattern, row, col - c);
+	
+						if (mask) {
+							dark = !dark;
+						}
+						
+						this.modules[row][col - c] = dark;
+						bitIndex--;
+	
+						if (bitIndex === -1) {
+							byteIndex++;
+							bitIndex = 7;
+						}
+					}
+				}
+								
+				row += inc;
+	
+				if (row < 0 || this.moduleCount <= row) {
+					row -= inc;
+					inc = -inc;
+					break;
+				}
+			}
+		}
+		
+	}
+
+};
+
+QRCode.PAD0 = 0xEC;
+QRCode.PAD1 = 0x11;
+
+QRCode.createData = function(typeNumber, errorCorrectLevel, dataList) {
+	
+	var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, errorCorrectLevel);
+	
+	var buffer = new QRBitBuffer();
+	
+	for (var i = 0; i < dataList.length; i++) {
+		var data = dataList[i];
+		buffer.put(data.mode, 4);
+		buffer.put(data.getLength(), QRUtil.getLengthInBits(data.mode, typeNumber) );
+		data.write(buffer);
+	}
+
+	// calc num max data.
+	var totalDataCount = 0;
+	for (var x = 0; x < rsBlocks.length; x++) {
+		totalDataCount += rsBlocks[x].dataCount;
+	}
+
+	if (buffer.getLengthInBits() > totalDataCount * 8) {
+		throw new Error("code length overflow. (" + 
+            buffer.getLengthInBits() + 
+            ">" +  
+            totalDataCount * 8 + 
+            ")");
+	}
+
+	// end code
+	if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+		buffer.put(0, 4);
+	}
+
+	// padding
+	while (buffer.getLengthInBits() % 8 !== 0) {
+		buffer.putBit(false);
+	}
+
+	// padding
+	while (true) {
+		
+		if (buffer.getLengthInBits() >= totalDataCount * 8) {
+			break;
+		}
+		buffer.put(QRCode.PAD0, 8);
+		
+		if (buffer.getLengthInBits() >= totalDataCount * 8) {
+			break;
+		}
+		buffer.put(QRCode.PAD1, 8);
+	}
+
+	return QRCode.createBytes(buffer, rsBlocks);
+};
+
+QRCode.createBytes = function(buffer, rsBlocks) {
+
+	var offset = 0;
+	
+	var maxDcCount = 0;
+	var maxEcCount = 0;
+	
+	var dcdata = new Array(rsBlocks.length);
+	var ecdata = new Array(rsBlocks.length);
+	
+	for (var r = 0; r < rsBlocks.length; r++) {
+
+		var dcCount = rsBlocks[r].dataCount;
+		var ecCount = rsBlocks[r].totalCount - dcCount;
+
+		maxDcCount = Math.max(maxDcCount, dcCount);
+		maxEcCount = Math.max(maxEcCount, ecCount);
+		
+		dcdata[r] = new Array(dcCount);
+		
+		for (var i = 0; i < dcdata[r].length; i++) {
+			dcdata[r][i] = 0xff & buffer.buffer[i + offset];
+		}
+		offset += dcCount;
+		
+		var rsPoly = QRUtil.getErrorCorrectPolynomial(ecCount);
+		var rawPoly = new QRPolynomial(dcdata[r], rsPoly.getLength() - 1);
+
+		var modPoly = rawPoly.mod(rsPoly);
+		ecdata[r] = new Array(rsPoly.getLength() - 1);
+		for (var x = 0; x < ecdata[r].length; x++) {
+            var modIndex = x + modPoly.getLength() - ecdata[r].length;
+			ecdata[r][x] = (modIndex >= 0)? modPoly.get(modIndex) : 0;
+		}
+
+	}
+	
+	var totalCodeCount = 0;
+	for (var y = 0; y < rsBlocks.length; y++) {
+		totalCodeCount += rsBlocks[y].totalCount;
+	}
+
+	var data = new Array(totalCodeCount);
+	var index = 0;
+
+	for (var z = 0; z < maxDcCount; z++) {
+		for (var s = 0; s < rsBlocks.length; s++) {
+			if (z < dcdata[s].length) {
+				data[index++] = dcdata[s][z];
+			}
+		}
+	}
+
+	for (var xx = 0; xx < maxEcCount; xx++) {
+		for (var t = 0; t < rsBlocks.length; t++) {
+			if (xx < ecdata[t].length) {
+				data[index++] = ecdata[t][xx];
+			}
+		}
+	}
+
+	return data;
+
+};
+
+module.exports = QRCode;
+
+ };
+ return {QRCode:req("index"),QRErrorCorrectLevel:req("QRErrorCorrectLevel")};
+})();
+
+</script>
+<script>
+/* ---------- Utilitaires ---------- */
+const $=id=>document.getElementById(id);
+const rnd=(n=8)=>Array.from(crypto.getRandomValues(new Uint8Array(n)),b=>'abcdefghijkmnpqrstuvwxyz23456789'[b%32]).join('');
+function h(tag,attrs={},...kids){
+  const e=document.createElement(tag);
+  for(const[k,v] of Object.entries(attrs)){
+    if(v===undefined||v===null||v===false)continue;
+    if(k==='class')e.className=v;
+    else if(k==='text')e.textContent=v;
+    else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);
+    else if(k==='style')e.setAttribute('style',v);
+    else if(k in e)e[k]=v;
+    else e.setAttribute(k,v);
+  }
+  for(const c of kids.flat())if(c!=null)e.append(c instanceof Node?c:document.createTextNode(c));
+  return e;
+}
+function initials(n){return (n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('')||'?';}
+function avatar(name,hue,size=44,presence,photo){
+  const base=`width:${size}px;height:${size}px;`;
+  const style=photo
+    ?base+`background:url(${photo}) center/cover no-repeat`
+    :base+`font-size:${Math.round(size*.36)}px;background:linear-gradient(135deg,hsl(${hue} 80% 58%),hsl(${(hue+50)%360} 75% 45%))`;
+  const a=h('div',{class:'av',style,text:photo?'':initials(name)});
+  if(presence)a.append(h('span',{class:'pres '+presence}));
+  return a;
+}
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2300);}
+async function copyText(t){try{await navigator.clipboard.writeText(t);toast('Copié');}catch(e){toast('Sélectionnez puis copiez le texte');}}
+function timeLabel(t){
+  const d=new Date(t),now=new Date();
+  if(d.toDateString()===now.toDateString())return d.toLocaleTimeString('fr-CA',{hour:'2-digit',minute:'2-digit'});
+  return d.toLocaleDateString('fr-CA',{day:'numeric',month:'short'});
+}
+function dayLabel(t){
+  const d=new Date(t),now=new Date(),y=new Date(now);y.setDate(now.getDate()-1);
+  if(d.toDateString()===now.toDateString())return "Aujourd'hui";
+  if(d.toDateString()===y.toDateString())return 'Hier';
+  return d.toLocaleDateString('fr-CA',{weekday:'long',day:'numeric',month:'long'});
+}
+
+/* ---------- Données ---------- */
+const KEY='mesinter_v2';
+let S;try{S=JSON.parse(localStorage.getItem(KEY));}catch(e){}
+if(!S||typeof S!=='object')S={};
+S.me=S.me||null;S.friends=S.friends||[];S.msgs=S.msgs||{};S.unread=S.unread||{};S.nick=S.nick||{};
+function saveData(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+// Connexions directes : pid = identifiant de la connexion, uid = identifiant stable de l'ami
+const conns={};
+let cur=null,stopCam=null;
+const friendName=f=>S.nick[f.id]||f.name;
+function connOf(uid){
+  const list=Object.values(conns).filter(c=>c.uid===uid);
+  return list.find(c=>c.state==='live')||list[list.length-1];
+}
+const presence=uid=>{if(uid==='claude')return S.apiKey?'live':'off';const gf=S.friends.find(x=>x.id===uid&&x.group);if(gf)return groupOnline(gf)>0?'live':'off';const c=connOf(uid);return c?c.state:'off';};
+function lastMsg(id){const l=S.msgs[id]||[];return l[l.length-1];}
+
+/* ---------- Codes d'échange ---------- */
+function enc(o){
+  const bytes=new TextEncoder().encode(JSON.stringify(o));
+  let bin='';for(const b of bytes)bin+=String.fromCharCode(b);
+  return btoa(bin);
+}
+function dec(s){
+  const bin=atob(s.trim().replace(/\s+/g,''));
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))));
+}
+/* ---------- Connexion directe WebRTC (réseau local, sans serveur) ---------- */
+function newConn(pid){
+  const pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun.cloudflare.com:3478"}]});
+  const c={pid,pc,dc:null,state:'attente',uid:null};
+  conns[pid]=c;
+  pc.ontrack=e=>{const a=document.createElement('audio');a.autoplay=true;a.srcObject=e.streams[0]||new MediaStream([e.track]);document.body.append(a);if(call)call.au=a;a.play().catch(()=>{});};
+  c.tm=setTimeout(()=>{if(c.state!=='live'){c.state='off';if(!c.uid){try{pc.close();}catch(e){}delete conns[pid];}renderAll();}},25000);
+  pc.onconnectionstatechange=()=>{
+    const st=pc.connectionState;
+    if(st==='connected')c.state='live';
+    else if(st==='disconnected'){c.state='attente';setTimeout(()=>{if(pc.connectionState==='disconnected'){c.state='off';renderAll();reconnectAll();}},10000);}
+    else if(st==='failed'||st==='closed'){c.state='off';reconnectAll();}
+    else c.state='attente';
+    renderAll();
+  };
+  return c;
+}
+// Une seule connexion par ami : l'ancienne est fermée lors d'un nouvel appairage
+function bindUid(c,uid){
+  for(const k of Object.keys(conns)){
+    if(conns[k]!==c&&conns[k].uid===uid){try{conns[k].pc.close();}catch(e){}delete conns[k];}
+  }
+  c.uid=uid;
+}
+function waitIce(pc){
+  return new Promise(res=>{
+    if(pc.iceGatheringState==='complete')return res();
+    const done=()=>{if(pc.iceGatheringState==='complete'){pc.removeEventListener('icegatheringstatechange',done);res();}};
+    pc.addEventListener('icegatheringstatechange',done);
+    setTimeout(res,8000);
+  });
+}
+function wireDC(c,dc){
+  c.dc=dc;
+  dc.onopen=()=>{c.state='live';shareKey(c);sendProfile(c);sendGroupsTo(c);flushPending(c.uid);renderAll();};
+  dc.onclose=()=>{c.state='off';renderAll();reconnectAll();};
+  dc.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(err){return;}if(c.uid)receive(c.uid,m);};
+}
+function cardOf(t,sdp,pid){return {v:2,t,pid,uid:S.me.id,n:S.me.name,h:S.me.handle,hue:S.me.hue,sdp};}
+async function createInvite(raw){
+  const pid=rnd(12);const c=newConn(pid);
+  wireDC(c,c.pc.createDataChannel('chat'));
+  await c.pc.setLocalDescription(await c.pc.createOffer());
+  await waitIce(c.pc);
+  const card=cardOf('o',c.pc.localDescription.sdp,pid);return raw?card:enc(card);
+}
+async function acceptOffer(code,raw){
+  const o=raw?code:dec(code);
+  if(o.t!=='o'||!o.sdp||!o.pid||!o.uid)throw new Error('Ce code n\'est pas une invitation Mesinter.');
+  if(o.uid===S.me.id)throw new Error('Vous ne pouvez pas vous ajouter vous-même.');
+  const c=newConn(o.pid);bindUid(c,o.uid);
+  c.pc.ondatachannel=e=>wireDC(c,e.channel);
+  await c.pc.setRemoteDescription({type:'offer',sdp:o.sdp});
+  await c.pc.setLocalDescription(await c.pc.createAnswer());
+  await waitIce(c.pc);
+  addFriend({id:o.uid,name:o.n,handle:o.h,hue:o.hue});
+  const ans=cardOf('a',c.pc.localDescription.sdp,o.pid);return raw?ans:enc(ans);
+}
+async function acceptAnswer(code,raw){
+  const o=raw?code:dec(code);
+  if(o.t!=='a'||!o.sdp||!o.pid||!o.uid)throw new Error('Ce code n\'est pas une réponse Mesinter.');
+  const c=conns[o.pid];
+  if(!c)throw new Error('Invitation introuvable. Créez une nouvelle invitation.');
+  if(o.uid===S.me.id)throw new Error('Vous ne pouvez pas vous ajouter vous-même.');
+  bindUid(c,o.uid);
+  await c.pc.setRemoteDescription({type:'answer',sdp:o.sdp});
+  return addFriend({id:o.uid,name:o.n,handle:o.h,hue:o.hue});
+}
+
+/* ---------- Amis et messages ---------- */
+function addFriend(f){
+  let ex=S.friends.find(x=>x.id===f.id);
+  if(ex){Object.assign(ex,{name:f.name,handle:f.handle,hue:f.hue});}
+  else{ex={...f,since:Date.now()};S.friends.push(ex);}
+  S.msgs[f.id]=S.msgs[f.id]||[];
+  saveData();renderAll();
+  return ex;
+}
+function removeFriend(id){
+  if(id==='claude')return;
+  for(const k of Object.keys(conns))if(conns[k].uid===id){try{conns[k].pc.close();}catch(e){}delete conns[k];}
+  S.friends=S.friends.filter(f=>f.id!==id);
+  delete S.msgs[id];delete S.unread[id];delete S.nick[id];
+  if(cur===id){cur=null;}
+  saveData();renderAll();
+}
+function send(){
+  const text=$('text').value.trim();
+  if(!text||!cur)return;
+  $('text').value='';$('text').style.height='';
+  if(cur==='claude'){sendToClaude(text);return;}
+  const gf=S.friends.find(x=>x.id===cur);if(gf&&gf.group){sendGroup(gf,text);return;}
+  const m={mine:true,text,t:Date.now(),ok:false,id:rnd(10)};
+  (S.msgs[cur]=S.msgs[cur]||[]).push(m);
+  saveData();trySend(cur,m);renderAll();
+}
+const inflight=new Set();
+function trySend(uid,m){
+  if(!m.id)m.id=rnd(10);
+  const c=connOf(uid);
+  if(c&&c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify({text:m.text,t:m.t,id:m.id}));m.ok=true;saveData();return;}catch(e){}}
+  const f=S.friends.find(x=>x.id===uid);
+  if(CAN_RELAY&&f&&f.key&&m.text.length<2000&&!inflight.has(m.id)){
+    inflight.add(m.id);
+    relaySend(f,m).then(ok=>{if(ok){m.ok=true;saveData();renderAll();}}).catch(()=>{}).finally(()=>inflight.delete(m.id));
+  }
+}
+function flushPending(id){for(const m of S.msgs[id]||[])if(m.mine&&!m.ok)trySend(id,m);saveData();}
+/* ---------- Relais chiffré (secours quand la connexion directe est coupée) ---------- */
+const CAN_RELAY=!!(window.crypto&&crypto.subtle),subs={},keyCache={};
+const b64=u=>{let t='';for(const x of u)t+=String.fromCharCode(x);return btoa(t);};
+const unb64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
+async function ckey(f){return keyCache[f.key]||(keyCache[f.key]=await crypto.subtle.importKey('raw',unb64(f.key),'AES-GCM',false,['encrypt','decrypt']));}
+async function ftopic(f){const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('t'+f.key));return 'mesinter-m-'+Array.from(new Uint8Array(d).slice(0,12),x=>x.toString(16).padStart(2,'0')).join('');}
+const relaySend=(f,m)=>relayRaw(f,{id:m.id,from:S.me.id,text:m.text,t:m.t});
+async function relayRaw(f,o){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},await ckey(f),new TextEncoder().encode(JSON.stringify(o))));
+  const all=new Uint8Array(12+ct.length);all.set(iv);all.set(ct,12);
+  return (await fetch('https://ntfy.sh/'+await ftopic(f),{method:'POST',body:b64(all)})).ok;
+}
+async function relaySub(f){
+  if(!CAN_RELAY||!f.key||subs[f.id]===f.key)return;
+  if(subs[f.id+'es'])subs[f.id+'es'].close();
+  subs[f.id]=f.key;
+  const es=new EventSource('https://ntfy.sh/'+await ftopic(f)+'/sse?since='+((S.rs&&S.rs[f.id])||'12h'));
+  subs[f.id+'es']=es;
+  es.onopen=()=>flushPending(f.id);
+  es.onmessage=async ev=>{
+    try{
+      const d=JSON.parse(ev.data);if(d.event!=='message'||!d.message)return;
+      const a=unb64(d.message);
+      const p=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:a.slice(0,12)},await ckey(f),a.slice(12))));
+      (S.rs=S.rs||{})[f.id]=d.time;
+      if(p.sig){onSig(f,p);return;}
+      if(p.del&&p.from!==S.me.id){delMsg(f.id,p.del);return;}
+      if(p.from===S.me.id||typeof p.text!=='string')return;
+      receive(f.id,{text:p.text,t:p.t,id:p.id});
+    }catch(e){}
+  };
+}
+// Le plus petit identifiant crée la clé et l'envoie par la connexion directe (déjà chiffrée)
+function shareKey(c){
+  const f=S.friends.find(x=>x.id===c.uid);
+  if(!CAN_RELAY||!f||!c.dc||c.dc.readyState!=='open'||S.me.id>f.id)return;
+  if(!f.key){f.key=b64(crypto.getRandomValues(new Uint8Array(32)));saveData();relaySub(f);}
+  try{c.dc.send(JSON.stringify({type:'key',k:f.key}));}catch(e){}
+}
+function applyKey(uid,m){
+  const f=S.friends.find(x=>x.id===uid);
+  if(!CAN_RELAY||!f||typeof m.k!=='string'||m.k.length!==44||S.me.id<f.id)return;
+  f.key=m.k;saveData();relaySub(f);renderAll();
+}
+const typing={},imgBuf={};let call=null;
+function bubBody(m){
+  if(m.img)return h('img',{src:m.img,alt:'photo'});
+  return /^https?:\/\/\S+\.(gif|png|jpe?g|webp)(\?\S*)?$/i.test(m.text||'')?h('img',{src:m.text,alt:'image',referrerPolicy:'no-referrer',loading:'lazy'}):h('div',{text:m.text});
+}
+function msgMenu(f,m){
+  const drop=()=>{S.msgs[f.id]=(S.msgs[f.id]||[]).filter(x=>x!==m);saveData();closeOverlay();renderAll();};
+  openOverlay([header('Message'),h('div',{class:'grid menu'},
+    m.img?h('button',{text:'Agrandir',onclick:()=>openOverlay([header('Photo'),h('img',{src:m.img,style:'width:100%;border-radius:14px'})])}):h('button',{text:'Copier',onclick:()=>{copyText(m.text);closeOverlay();}}),
+    h('button',{class:'danger',text:'Supprimer pour moi',onclick:drop}),
+    (m.mine&&m.id&&!f.group&&!f.ai)?h('button',{class:'danger',text:'Supprimer pour tous',onclick:()=>{sendDel(f,m.id);drop();}}):null)]);
+}
+function delMsg(uid,mid){if(!mid)return;S.msgs[uid]=(S.msgs[uid]||[]).filter(x=>x.id!==mid||x.mine);saveData();renderAll();}
+function sendDel(f,mid){
+  const c=connOf(f.id);
+  if(c&&c.dc&&c.dc.readyState==='open')try{c.dc.send(JSON.stringify({type:'del',id:mid}));}catch(e){}
+  if(CAN_RELAY&&f.key)relayRaw(f,{del:mid,from:S.me.id}).catch(()=>{});
+}
+function fitPhoto(file,max){return new Promise((res,rej)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const k=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',.7));};img.onerror=()=>{URL.revokeObjectURL(url);rej();};img.src=url;});}
+function sendImg(f,u){
+  const c=connOf(f.id);
+  if(!(c&&c.dc&&c.dc.readyState==='open'))return toast('Connexion directe requise pour envoyer une photo');
+  const id=rnd(10),n=Math.ceil(u.length/15000);
+  for(let i=0;i<n;i++)c.dc.send(JSON.stringify({type:'img',id,i,n,t:Date.now(),d:u.slice(i*15000,(i+1)*15000)}));
+  (S.msgs[f.id]=S.msgs[f.id]||[]).push({mine:true,img:u,t:Date.now(),ok:true,id});
+  saveData();renderAll();
+}
+function onImg(uid,m){
+  if(typeof m.id!=='string'||!(m.n>0&&m.n<=100)||typeof m.d!=='string')return;
+  const b=imgBuf[m.id]=imgBuf[m.id]||{p:[],k:0};
+  if(b.p[m.i]===undefined){b.p[m.i]=m.d;b.k++;}
+  if(b.k<m.n)return;
+  const u=b.p.join('');delete imgBuf[m.id];
+  if(!u.startsWith('data:image/')||u.length>1500000)return;
+  (S.msgs[uid]=S.msgs[uid]||[]).push({mine:false,img:u,t:m.t||Date.now(),id:m.id});
+  delete typing[uid];if(cur!==uid)S.unread[uid]=(S.unread[uid]||0)+1;
+  saveData();renderAll();
+}
+const dcSend=(c,o)=>{try{c.dc.send(JSON.stringify(o));return true;}catch(e){return false;}};
+async function mic(c){try{const st=await navigator.mediaDevices.getUserMedia({audio:true});st.getAudioTracks().forEach(t=>c.pc.addTrack(t,st));return st;}catch(e){toast('Micro indisponible');return null;}}
+function callUi(txt,btns){openOverlay([h('h2',{text:txt}),h('div',{class:'row'},...btns)]);}
+const hang=()=>h('button',{class:'danger',text:'Raccrocher',onclick:()=>endCall(true)});
+function endCall(send){
+  if(!call)return;const k=call;call=null;
+  if(send&&k.c.dc&&k.c.dc.readyState==='open')dcSend(k.c,{type:'call',a:'end'});
+  if(k.st)k.st.getTracks().forEach(t=>t.stop());
+  if(k.au)k.au.remove();
+  closeOverlay();
+}
+async function startCall(f){
+  const c=connOf(f.id);
+  if(!(c&&c.dc&&c.dc.readyState==='open'))return toast('Connexion directe requise pour appeler');
+  if(call)return;
+  const st=await mic(c);if(!st)return;
+  call={c,st,f,role:'out'};
+  callUi('Appel vers '+friendName(f)+'…',[hang()]);
+  dcSend(c,{type:'call',a:'ring'});
+}
+function onCall(uid,m){
+  const c=connOf(uid),f=S.friends.find(x=>x.id===uid);if(!c||!f)return;
+  if(m.a==='ring'){
+    if(call)return dcSend(c,{type:'call',a:'busy'});
+    call={c,f,role:'in'};
+    callUi(friendName(f)+' t\'appelle',[
+      h('button',{class:'primary',text:'Répondre',onclick:async()=>{const st=await mic(c);if(!st){endCall(true);return;}call.st=st;callUi('En appel avec '+friendName(f),[hang()]);dcSend(c,{type:'call',a:'ok'});}}),
+      h('button',{class:'danger',text:'Refuser',onclick:()=>endCall(true)})]);
+  }else if(m.a==='ok'&&call&&call.role==='out'){
+    callUi('En appel avec '+friendName(f),[hang()]);
+    c.pc.createOffer().then(o=>c.pc.setLocalDescription(o)).then(()=>dcSend(c,{type:'sdp',d:c.pc.localDescription})).catch(()=>toast('Appel impossible'));
+  }else if(m.a==='end'||m.a==='busy'){if(call){if(m.a==='busy')toast('Occupé');endCall(false);}}
+}
+async function onSdp(uid,m){
+  const c=connOf(uid);if(!c||!m.d)return;
+  try{await c.pc.setRemoteDescription(m.d);if(m.d.type==='offer'){await c.pc.setLocalDescription(await c.pc.createAnswer());dcSend(c,{type:'sdp',d:c.pc.localDescription});}}catch(e){}
+}
+/* ---------- Reconnexion automatique (signal chiffré par le relais, sans code) ---------- */
+const tried={},seenPid=new Set();
+async function autoConnect(f){
+  if(!CAN_RELAY||!f.key||f.group||f.ai||S.me.id>f.id||document.hidden||!navigator.onLine)return;
+  const c=connOf(f.id);
+  if(c&&(c.state==='live'||c.state==='attente'))return;
+  if(Date.now()-(tried[f.id]||0)<20000)return;
+  tried[f.id]=Date.now();
+  try{const card=await createInvite(true);await relayRaw(f,{sig:'o',from:S.me.id,card,t:Date.now()});}catch(e){}
+}
+const reconnectAll=()=>{for(const f of S.friends)autoConnect(f);};
+setInterval(()=>{reconnectAll();for(const k in conns){const c=conns[k];if(c.dc&&c.dc.readyState==='open')try{c.dc.send('{"type":"ping"}');}catch(e){}}},15000);
+async function onSig(f,p){
+  if(!p.card||Date.now()-p.t>120000)return;
+  if(p.sig==='o'&&S.me.id>f.id&&!seenPid.has(p.card.pid)){
+    const c=connOf(f.id);if(c&&c.state==='live')return;
+    seenPid.add(p.card.pid);
+    try{const ans=await acceptOffer(p.card,true);await relayRaw(f,{sig:'a',from:S.me.id,card:ans,t:Date.now()});}catch(e){}
+  }else if(p.sig==='a'&&S.me.id<f.id&&conns[p.card.pid]&&!conns[p.card.pid].uid){
+    try{await acceptAnswer(p.card,true);}catch(e){}
+  }
+}
+function profileMsg(){return {type:'profile',name:S.me.name,hue:S.me.hue,photo:S.me.photo||null,bio:S.me.bio||'',accent:typeof S.me.accent==='number'?S.me.accent:null};}
+function bannerMsg(){return {type:'banner',banner:S.me.banner||null};}
+function sendProfile(c){if(c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify(profileMsg()));c.dc.send(JSON.stringify(bannerMsg()));}catch(e){}}}
+function broadcastProfile(){for(const k of Object.keys(conns))sendProfile(conns[k]);}
+function applyProfile(uid,m){
+  const f=S.friends.find(x=>x.id===uid);if(!f)return;
+  if(typeof m.name==='string'&&m.name.trim())f.name=m.name.trim().slice(0,30);
+  if(typeof m.hue==='number')f.hue=m.hue;
+  f.photo=(typeof m.photo==='string'&&m.photo.startsWith('data:image/')&&m.photo.length<200000)?m.photo:null;
+  f.bio=typeof m.bio==='string'?m.bio.slice(0,80):'';f.accent=typeof m.accent==='number'?m.accent:null;
+  saveData();renderAll();
+}
+function applyBanner(uid,m){const f=S.friends.find(x=>x.id===uid);if(!f)return;f.banner=(typeof m.banner==='string'&&m.banner.startsWith('data:image/')&&m.banner.length<150000)?m.banner:null;saveData();renderAll();}
+function receive(id,m){
+  if(m&&m.type==='typing'){typing[id]=Date.now();if(cur===id)renderChat();setTimeout(()=>{if(cur===id&&Date.now()-typing[id]>=3900)renderChat();},4000);return;}
+  if(m&&m.type==='del'){delMsg(id,m.id);return;}
+  if(m&&m.type==='img'){onImg(id,m);return;}
+  if(m&&m.type==='call'){onCall(id,m);return;}
+  if(m&&m.type==='sdp'){onSdp(id,m);return;}
+  if(m&&m.type==='profile'){applyProfile(id,m);return;}
+  if(m&&m.type==='banner'){applyBanner(id,m);return;}
+  if(m&&m.type==='key'){applyKey(id,m);return;}
+  if(m&&m.type==='groupinfo'){onGroupInfo(id,m.g);return;}
+  if(m&&m.type==='gleave'){onGroupLeave(id,m.g);return;}
+  if(m&&m.type==='gmsg'){onGroupMsg(id,m);return;}
+  if(typeof m.text!=='string')return;
+  if(m.id){const l=((S.seen=S.seen||{})[id]=S.seen[id]||[]);if(l.includes(m.id))return;l.push(m.id);if(l.length>300)l.shift();}
+  delete typing[id];
+  (S.msgs[id]=S.msgs[id]||[]).push({mine:false,text:m.text.slice(0,4000),t:m.t||Date.now()});
+  if(cur!==id)S.unread[id]=(S.unread[id]||0)+1;
+  saveData();renderAll();
+}
+function openChat(id){
+  cur=id;S.last=id;S.unread[id]=0;$('launch').hidden=true;saveData();
+  $('app').classList.add('open');
+  renderAll();
+  setTimeout(()=>$('text').focus(),50);
+}
+
+/* ---------- Affichage ---------- */
+function renderAll(){renderSide();renderChat();}
+function renderSide(){
+  const box=$('friends');
+  const q=$('q').value.trim().toLowerCase();
+  const list=S.friends
+    .filter(f=>!q||friendName(f).toLowerCase().includes(q)||(f.handle||'').toLowerCase().includes(q))
+    .sort((a,b)=>((lastMsg(b.id)||{t:b.since}).t)-((lastMsg(a.id)||{t:a.since}).t));
+  box.replaceChildren();
+  if(!S.friends.length){
+    box.append(h('div',{class:'empty',text:'Aucun ami pour le moment. Appuyez sur « + Ami » pour commencer.'}));
+    return;
+  }
+  if(!list.length){box.append(h('div',{class:'empty',text:'Aucun résultat.'}));return;}
+  box.append(h('div',{class:'sect',text:'Amis · '+S.friends.filter(x=>!x.group).length}));
+  for(const f of list){
+    const lm=lastMsg(f.id),unread=S.unread[f.id]||0;
+    const preview=lm?((lm.mine?'Vous : ':(f.group&&lm.from?lm.from+' : ':''))+(lm.text||'📷 Photo')):(f.group?groupMembers(f).length+1+' membres':'Pas encore de message');
+    const item=h('div',{class:'fr'+(f.id===cur?' on':''),onclick:()=>openChat(f.id)},
+      avatar(friendName(f),f.hue,48,presence(f.id),f.photo),
+      h('div',{class:'grow'},h('div',{class:'nm',text:friendName(f)}),h('div',{class:'sub',text:preview})),
+      h('div',{class:'meta'},lm?timeLabel(lm.t):'',unread?h('span',{class:'badge',text:String(unread)}):null)
+    );
+    box.append(item);
+  }
+}
+function renderChat(){
+  const f=S.friends.find(x=>x.id===cur);
+  const head=$('chead');
+  $('text').disabled=!f;$('send').disabled=!f;
+  head.hidden=!f;$('callBtn').hidden=!f||!!f.group||!!f.ai;
+  if(!f){
+    $('app').classList.remove('open');
+    $('msgs').replaceChildren(h('div',{class:'welcome'},
+      h('div',{class:'bigmark',text:'M'}),
+      h('h2',{text:'Bienvenue sur Mesinter'}),
+      h('p',{text:'Discutez avec vos amis sans Internet, directement d\'appareil à appareil sur le même réseau local.'}),
+      h('button',{class:'primary',text:'Ajouter un ami',onclick:openAdd})
+    ));
+    return;
+  }
+  const p=presence(f.id);
+  const label=f.group?(f.members.length+' membres · '+groupOnline(f)+' en ligne'):f.ai?(S.apiKey?'Assistant IA · réponses via Internet':'Ajoutez votre clé API dans l\'accueil'):p==='live'?'En ligne · direct, sans Internet':p==='attente'?'Connexion en cours…':(f.key&&CAN_RELAY?'Hors ligne · envoi par relais':'Hors ligne · reconnectez-vous pour envoyer');
+  $('chPeer').replaceChildren(
+    avatar(friendName(f),f.hue,42,p,f.photo),
+    h('div',{class:'grow'},h('div',{class:'name',text:friendName(f)}),h('div',{class:'sub',text:label}))
+  );
+  const box=$('msgs');box.replaceChildren();
+  const msgs=S.msgs[f.id]||[];
+  if(!msgs.length)box.append(h('div',{class:'empty',text:'Aucun message. Envoyez le premier !'}));
+  let lastDay='';
+  for(const m of msgs){
+    const d=dayLabel(m.t);
+    if(d!==lastDay){box.append(h('div',{class:'day',text:d}));lastDay=d;}
+    const tick=m.mine?(m.ok?' · ✓':' · …'):'';
+    box.append(h('div',{class:'bub'+(m.mine?' me':''),onclick:()=>msgMenu(f,m)},
+      (f.group&&!m.mine&&m.from)?h('div',{class:'from',text:m.from}):null,
+      bubBody(m),
+      h('div',{class:'t'},h('span',{text:timeLabel(m.t)+tick}))
+    ));
+  }
+  if(typing[f.id]&&Date.now()-typing[f.id]<4000)box.append(h('div',{class:'bub typing',title:'écrit…'},h('i'),h('i'),h('i')));
+  if(!f.group&&!f.ai&&p!=='live')box.append(h('div',{class:'notice'},h('span',{text:p==='attente'?'Connexion en cours…':(f.key&&CAN_RELAY?'Connexion directe coupée : les messages passent par le relais (Internet requis).':'Hors ligne : tes messages partiront dès que la connexion revient.')}),p==='attente'?null:h('button',{class:'primary',text:'Reconnecter',onclick:openAdd})));
+  box.scrollTop=box.scrollHeight;
+}
+
+/* ---------- Fenêtres ---------- */
+function openOverlay(nodes){
+  $('card').replaceChildren(...nodes);
+  $('overlay').hidden=false;
+}
+function closeOverlay(){
+  if(stopCam){stopCam();stopCam=null;}
+  $('overlay').hidden=true;$('card').replaceChildren();
+}
+function header(title){return h('div',{class:'row',style:'justify-content:space-between'},h('h2',{text:title}),h('button',{class:'ghost',text:'Fermer',onclick:closeOverlay}));}
+function qrNode(text){
+  const box=h('div',{class:'qr'});
+  try{
+    const q=new QRLib.QRCode(-1,QRLib.QRErrorCorrectLevel.L);
+    q.addData(text);q.make();
+    const n=q.getModuleCount(),m=2;let d='';
+    for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(q.isDark(r,c))d+='M'+(c+m)+' '+(r+m)+'h1v1h-1z';
+    box.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+(n+2*m)+' '+(n+2*m)+'" shape-rendering="crispEdges" role="img" aria-label="Code QR"><rect width="100%" height="100%" fill="#fff"/><path d="'+d+'" fill="#000"/></svg>';
+  }catch(e){box.replaceChildren(h('p',{class:'muted',style:'color:#333',text:'Code trop long pour un QR code. Utilisez le texte ci-dessous.'}));}
+  return box;
+}
+function codeBox(code){
+  const ta=h('textarea',{readOnly:true,value:code,rows:3,onfocus:e=>e.target.select()});
+  return h('div',{class:'grid'},qrNode(code),ta,h('div',{class:'row'},
+    h('button',{text:'Copier',onclick:()=>copyText(code)}),
+    navigator.share?h('button',{text:'Partager',onclick:()=>navigator.share({text:code}).catch(()=>{})}):null
+  ));
+}
+function openAdd(){
+  if(!S.me)return askProfile(openAdd);
+  startInbox();
+  const inp=h('input',{placeholder:'Code de ton ami',maxLength:9,autocapitalize:'characters',autocomplete:'off',style:'text-transform:uppercase;letter-spacing:.2em;text-align:center'});
+  const err=h('div',{class:'err'}),out=h('div',{class:'grid'}),more=h('div',{class:'grid'});
+  const go=async()=>{
+    const code=inp.value.toUpperCase().replace(/[^A-Z]/g,'');err.textContent='';
+    if(code.length!==8){err.textContent='Le code a 8 lettres.';return;}
+    out.replaceChildren(h('p',{class:'muted',text:'Demande envoyée. En attente de ton ami (il doit avoir Mesinter ouvert)…'}));
+    try{const f=await requestFriend(code);closeOverlay();openChat(f.id);toast(friendName(f)+' est ajouté');}
+    catch(e){out.replaceChildren();err.textContent=e.message||'Erreur';}
+  };
+  openOverlay([header('Ajouter un ami'),
+    h('p',{class:'muted',text:'Ton code. Donne-le à ton ami :'}),
+    h('div',{class:'codebig',text:S.me.code,onclick:()=>copyText(S.me.code)}),
+    h('div',{class:'row'},h('button',{text:'Copier',onclick:()=>copyText(S.me.code)}),
+      navigator.share?h('button',{text:'Partager',onclick:()=>navigator.share({text:'Mon code Mesinter : '+S.me.code}).catch(()=>{})}):null,
+      h('button',{class:'ghost',text:'Nouveau code',onclick:()=>{if(confirm('L\'ancien code ne marchera plus. Continuer ?')){S.me.code=newCode();saveData();startInbox();openAdd();}}})),
+    h('hr'),h('p',{class:'muted',text:'Ton ami t\'a donné son code ? Entre-le :'}),inp,
+    h('button',{class:'primary',text:'Ajouter',onclick:go}),err,out,h('hr'),
+    h('button',{class:'ghost',text:'Sans Internet (même Wi-Fi)',onclick:()=>{more.replaceChildren();inviteTab(more);more.append(h('hr'));joinTab(more);}}),more]);
+}
+const RELAY='https://ntfy.sh/',L8='ABCDEFGHJKMNPQRSTUVWXYZ';
+function newCode(){let c='';while(c.length<8){const b=crypto.getRandomValues(new Uint8Array(1))[0];if(b<253)c+=L8[b%23];}return c;}
+const relayTopic=c=>'mesinter-'+c.toLowerCase();
+async function pack(o){
+  let b=new TextEncoder().encode(JSON.stringify(o)),t='p';
+  if(window.CompressionStream){try{b=new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());t='z';}catch(e){b=new TextEncoder().encode(JSON.stringify(o));}}
+  let bin='';for(const x of b)bin+=String.fromCharCode(x);return t+btoa(bin);
+}
+async function unpack(s){
+  let b=Uint8Array.from(atob(s.slice(1)),c=>c.charCodeAt(0));
+  if(s[0]==='z')b=new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+  return JSON.parse(new TextDecoder().decode(b));
+}
+async function relayPost(code,o){
+  let r;try{r=await fetch(RELAY+relayTopic(code),{method:'POST',body:await pack(o)});}catch(e){throw new Error('Internet requis pour utiliser un code.');}
+  if(!r.ok)throw new Error('Relais indisponible, réessaie.');
+}
+function relayListen(code,cb){
+  const es=new EventSource(RELAY+relayTopic(code)+'/sse?since=all');
+  es.onmessage=async ev=>{try{const d=JSON.parse(ev.data);if(d.event==='message'&&d.message)cb(await unpack(d.message),d.time);}catch(e){}};
+  return()=>es.close();
+}
+let inboxStop=null,inboxCode=null;const seenReq=new Set();
+function startInbox(){
+  if(!S.me)return;
+  if(!S.me.code){S.me.code=newCode();saveData();}
+  if(inboxCode===S.me.code)return;
+  if(inboxStop)inboxStop();
+  inboxCode=S.me.code;inboxStop=relayListen(inboxCode,onRequest);
+}
+async function onRequest(m,time){
+  if(!m||m.t!=='o'||!m.pid||!m.uid||m.uid===S.me.id||seenReq.has(m.pid)||Date.now()/1000-time>300)return;
+  seenReq.add(m.pid);
+  const code=S.me.code;
+  const accept=async()=>{try{await relayPost(code,await acceptOffer(m,true));closeOverlay();toast((m.n||'Ami')+' est ajouté');}catch(e){toast(e.message||'Erreur');}};
+  if(S.friends.some(f=>f.id===m.uid))return accept();
+  openOverlay([h('h2',{text:(m.n||'Quelqu\'un')+' veut t\'ajouter'}),h('div',{class:'row'},
+    h('button',{class:'primary',text:'Accepter',onclick:accept}),
+    h('button',{text:'Refuser',onclick:()=>{relayPost(code,{t:'r',pid:m.pid}).catch(()=>{});closeOverlay();}}))]);
+}
+async function requestFriend(code){
+  if(code===S.me.code)throw new Error('C\'est ton propre code.');
+  const card=await createInvite(true),pid=card.pid;
+  await relayPost(code,card);
+  return new Promise((res,rej)=>{
+    let stop=null;
+    const end=()=>{clearTimeout(tm);if(stop)stop();};
+    const tm=setTimeout(()=>{end();const c=conns[pid];if(c&&!c.uid){try{c.pc.close();}catch(e){}delete conns[pid];}rej(new Error('Pas de réponse. Ton ami doit avoir Mesinter ouvert.'));},180000);
+    stop=relayListen(code,async m=>{
+      if(!m||m.pid!==pid)return;
+      if(m.t==='r'){end();rej(new Error('Demande refusée.'));}
+      else if(m.t==='a'){end();try{res(await acceptAnswer(m,true));}catch(e){rej(e);}}
+    });
+  });
+}
+function inviteTab(box){
+  const out=h('div',{class:'grid'});
+  box.append(h('p',{class:'muted',text:'1. Créez une invitation et envoyez-la à votre ami.'}),
+    h('button',{class:'primary',text:'Créer une invitation',onclick:async()=>{
+      out.replaceChildren(h('p',{class:'muted',text:'Préparation de l\'invitation…'}));
+      try{
+        const code=await createInvite();
+        const reply=h('textarea',{placeholder:'Collez ici la réponse de votre ami',rows:3});
+        const err=h('div',{class:'err'});
+        const scanZone=h('div',{class:'grid'});
+        const connect=async()=>{
+          err.textContent='';
+          try{const f=await acceptAnswer(reply.value);toast(friendName(f)+' est ajouté');closeOverlay();openChat(f.id);}
+          catch(e){err.textContent=e.message||'Réponse invalide';}
+        };
+        const scanBtn=('BarcodeDetector' in window&&navigator.mediaDevices)?h('button',{text:'Scanner sa réponse',onclick:()=>{
+          if(stopCam)stopCam();
+          scanCamera(c=>{reply.value=c;connect();},scanZone).then(st=>{stopCam=st;});
+        }}):null;
+        out.replaceChildren(codeBox(code),
+          h('p',{class:'muted',text:'2. Quand votre ami vous renvoie sa réponse, scannez son QR code ou collez le texte.'}),
+          scanBtn,scanZone,reply,
+          h('button',{class:'primary',text:'Connecter',onclick:connect}),err);
+      }catch(e){out.replaceChildren(h('p',{class:'err',text:'Impossible de créer l\'invitation : '+e.message}));}
+    }}),out);
+}
+function joinTab(box){
+  const scanBox=h('div',{class:'grid'});
+  const inp=h('textarea',{placeholder:'Collez ici le code d\'invitation',rows:3});
+  const err=h('div',{class:'err'});
+  const out=h('div',{class:'grid'});
+  const run=async code=>{
+    out.replaceChildren();err.textContent='';
+    try{
+      const reply=await acceptOffer(code.trim());
+      out.replaceChildren(h('p',{class:'muted',text:'3. Envoyez cette réponse à votre ami. La connexion se fait dès qu\'il la colle.'}),codeBox(reply));
+      renderAll();
+    }catch(e){err.textContent=e.message||'Code invalide';}
+  };
+  const kids=[h('p',{class:'muted',text:'1. Recevez l\'invitation de votre ami, puis scannez-la ou collez-la.'})];
+  if('BarcodeDetector' in window&&navigator.mediaDevices){
+    kids.push(h('button',{text:'Scanner avec la caméra',onclick:()=>{
+      if(stopCam)stopCam();
+      scanCamera(c=>run(c),scanBox).then(s=>{stopCam=s;});
+    }}));
+  }
+  box.append(...kids,scanBox,inp,
+    h('button',{class:'primary',text:'Générer ma réponse',onclick:()=>run(inp.value)}),err,out);
+}
+async function scanCamera(onCode,box){
+  const video=h('video',{playsinline:true,muted:true,autoplay:true,style:'width:100%;border-radius:14px;background:#000'});
+  box.replaceChildren(video,h('p',{class:'muted',text:'Pointez la caméra vers le code QR de votre ami.'}));
+  let stream;
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});}
+  catch(e){box.replaceChildren(h('p',{class:'err',text:'Caméra refusée ou indisponible. Collez le code à la place.'}));return null;}
+  video.srcObject=stream;
+  const det=new BarcodeDetector({formats:['qr_code']});
+  let done=false;
+  const stop=()=>{done=true;stream.getTracks().forEach(t=>t.stop());};
+  const tick=async()=>{
+    if(done)return;
+    if(!video.isConnected){stop();return;}
+    try{const codes=await det.detect(video);if(codes.length){stop();onCode(codes[0].rawValue);return;}}catch(e){}
+    setTimeout(tick,250);
+  };
+  video.addEventListener('loadeddata',tick,{once:true});
+  return stop;
+}
+function askProfile(next){
+  const nm=h('input',{placeholder:'Votre prénom',maxLength:30});
+  const err=h('div',{class:'err'});
+  openOverlay([header('Bienvenue'),
+    h('p',{class:'muted',text:'Choisissez le nom que vos amis verront.'}),nm,err,
+    h('button',{class:'primary',text:'Continuer',onclick:()=>{
+      const v=nm.value.trim();
+      if(!v){err.textContent='Entrez un prénom.';return;}
+      S.me={id:rnd(10),name:v,handle:'@'+rnd(6),hue:Math.floor(Math.random()*360)};
+      saveData();closeOverlay();renderAll();startInbox();if(next)next();
+    }})]);
+  setTimeout(()=>nm.focus(),50);
+}
+function squarePhoto(file,size){
+  return new Promise((res,rej)=>{
+    const img=new Image(),url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const s=Math.min(img.width,img.height),sx=(img.width-s)/2,sy=(img.height-s)/2;
+      const c=document.createElement('canvas');c.width=c.height=size;
+      c.getContext('2d').drawImage(img,sx,sy,s,s,0,0,size,size);
+      URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',.82));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('Image illisible'));};
+    img.src=url;
+  });
+}
+function cropPhoto(file,w,hh){return new Promise((res,rej)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const k=Math.max(w/img.width,hh/img.height),sw=w/k,sh=hh/k,c=document.createElement('canvas');c.width=w;c.height=hh;c.getContext('2d').drawImage(img,(img.width-sw)/2,(img.height-sh)/2,sw,sh,0,0,w,hh);URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',.75));};img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('Image illisible'));};img.src=url;});}
+const HUES=[265,215,175,140,45,15,340,300];
+function applyAccent(){
+  const r=document.documentElement.style,a=S.me&&typeof S.me.accent==='number'?S.me.accent:null;
+  if(a===null){r.removeProperty('--accent');r.removeProperty('--accent2');return;}
+  r.setProperty('--accent','hsl('+a+' 85% 62%)');r.setProperty('--accent2','hsl('+((a+40)%360)+' 85% 60%)');
+}
+function profHead(o,name){
+  const a=typeof o.accent==='number'?o.accent:o.hue;
+  const bg=o.banner?'url('+o.banner+') center/cover':'linear-gradient(120deg,hsl('+a+' 75% 52%),hsl('+((a+60)%360)+' 70% 40%))';
+  return h('div',{class:'pwrap'},h('div',{class:'pbanner',style:'background:'+bg}),avatar(name,o.hue,84,null,o.photo));
+}
+function openFriendProfile(f){
+  if(f.group||f.ai)return openMenu(f);
+  const p=presence(f.id);
+  openOverlay([header(friendName(f)),profHead(f,friendName(f)),
+    h('div',{class:'grid',style:'gap:4px'},h('div',{class:'nm',text:friendName(f)}),f.bio?h('div',{text:f.bio}):null,h('div',{class:'sub',text:f.handle+(p==='live'?', en ligne':', hors ligne')})),
+    h('button',{class:'primary',text:'Écrire',onclick:()=>{closeOverlay();openChat(f.id);}}),
+    h('button',{text:'Options',onclick:()=>openMenu(f)})]);
+}
+function exportChat(f){
+  const lines=(S.msgs[f.id]||[]).map(m=>'['+new Date(m.t).toLocaleString('fr-CA')+'] '+(m.mine?S.me.name:(f.group&&m.from?m.from:friendName(f)))+' : '+m.text);
+  const blob=new Blob(['Conversation avec '+friendName(f)+'\n\n'+lines.join('\n')+'\n'],{type:'text/plain'});
+  const a=h('a',{href:URL.createObjectURL(blob),download:'mesinter-'+friendName(f).replace(/\W+/g,'_')+'.txt'});
+  document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function exportAll(){
+  const copy={...S};delete copy.apiKey;
+  const blob=new Blob([JSON.stringify(copy,null,1)],{type:'application/json'});
+  const a=h('a',{href:URL.createObjectURL(blob),download:'mesinter-sauvegarde.json'});
+  document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+async function importBackup(f){
+  if(!f)return;
+  try{
+    const data=JSON.parse(await f.text());
+    if(!data.me||!Array.isArray(data.friends))throw new Error('Fichier invalide');
+    if(!confirm('Remplacer toutes les données actuelles par cette sauvegarde ?'))return;
+    localStorage.setItem(KEY,JSON.stringify(data));location.reload();
+  }catch(e){toast(e.message||'Import impossible');}
+}
+function openHelp(){
+  openOverlay([header('Aide'),
+    h('div',{class:'grid',style:'gap:8px'},
+      h('p',{class:'muted',text:'1. Ajoutez un ami avec « + Ami ». Créez une invitation, puis l\'autre personne la scanne ou la colle et vous renvoie sa réponse.'}),
+      h('p',{class:'muted',text:'2. Dans la même maison, le Wi-Fi suffit. Entre maisons, les deux appareils doivent avoir Internet.'}),
+      h('p',{class:'muted',text:'3. Les conversations sont enregistrées sur cet appareil. Exportez vos données de temps en temps depuis le menu ☰.'}),
+      h('p',{class:'muted',text:'4. Après un redémarrage, refaites l\'appairage avec un nouveau code.'})
+    )]);
+}
+/* ---------- Assistant Claude (Internet requis, clé API personnelle) ---------- */
+const CLAUDE_MODEL='claude-sonnet-5-5';
+function ensureClaude(){
+  const cf=S.friends.find(f=>f.id==='claude');if(!cf)S.friends.push({id:'claude',name:'Mesinter IA',handle:'Assistant IA',hue:20,ai:true,since:0});else{cf.name='Mesinter IA';cf.handle='Assistant IA';}
+  S.msgs.claude=S.msgs.claude||[];
+  saveData();
+}
+function openKeyDialog(){
+  const inp=h('input',{type:'password',placeholder:'sk-ant-…',value:S.apiKey||'',autocomplete:'off'});
+  const err=h('div',{class:'err'});
+  openOverlay([header('Mesinter IA'),
+    h('p',{class:'muted',text:'Collez votre clé API Anthropic pour discuter avec Mesinter IA. Elle est gardée sur cet appareil et n\'est jamais incluse dans les exports. Une connexion Internet est requise pour Mesinter IA.'}),
+    inp,err,
+    h('div',{class:'row'},
+      h('button',{class:'primary',text:'Enregistrer',onclick:()=>{
+        const v=inp.value.trim();
+        if(!v.startsWith('sk-')){err.textContent='Cette clé ne ressemble pas à une clé Anthropic.';return;}
+        S.apiKey=v;saveData();closeOverlay();renderAll();toast('Mesinter IA est prêt');
+      }}),
+      S.apiKey?h('button',{class:'ghost danger',text:'Supprimer la clé',onclick:()=>{delete S.apiKey;saveData();closeOverlay();renderAll();}}):null)
+  ]);
+  setTimeout(()=>inp.focus(),50);
+}
+function openAiMenu(f){
+  openOverlay([header(friendName(f)),
+    h('div',{class:'grid menu'},
+      h('button',{text:'Exporter la conversation (.txt)',onclick:()=>exportChat(f)}),
+      h('button',{text:'Effacer la conversation',onclick:()=>{if(confirm('Effacer la conversation avec Mesinter IA ?')){S.msgs.claude=[];saveData();closeOverlay();renderAll();}}}),
+      h('button',{text:'Clé API Mesinter IA',onclick:openKeyDialog})
+    )]);
+}
+async function askClaude(messages){
+  const r=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'content-type':'application/json','x-api-key':S.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:CLAUDE_MODEL,max_tokens:1024,system:'Tu es Mesinter IA, un assistant intégré à l\'application de messagerie Mesinter. Réponds en français, de façon claire et concise.',messages})
+  });
+  if(!r.ok){
+    let detail='';try{detail=(await r.json()).error.message;}catch(e){}
+    throw new Error('Erreur '+r.status+(detail?' : '+detail:''));
+  }
+  const data=await r.json();
+  return (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim()||'(réponse vide)';
+}
+function buildHistory(list){
+  const out=[];
+  for(const m of list){
+    if(m.pending||!m.text)continue;
+    const role=m.mine?'user':'assistant';
+    if(out.length&&out[out.length-1].role===role)out[out.length-1].content+='\n'+m.text;
+    else out.push({role,content:m.text});
+  }
+  while(out.length&&out[0].role!=='user')out.shift();
+  return out.slice(-30);
+}
+let claudeBusy=false;
+async function sendToClaude(text){
+  if(claudeBusy)return toast('Mesinter IA répond encore…');
+  const list=S.msgs.claude=S.msgs.claude||[];
+  list.push({mine:true,text,t:Date.now(),ok:true});
+  const reply={mine:false,text:'…',t:Date.now(),pending:true};
+  list.push(reply);
+  saveData();renderAll();
+  if(!S.apiKey){reply.text='Ajoutez votre clé API dans l\'accueil pour me parler.';}
+  else{
+    claudeBusy=true;
+    try{reply.text=await askClaude(buildHistory(list.slice(0,-1)));}
+    catch(e){reply.text=(navigator.onLine?'':'Pas de connexion Internet. ')+(e.message||'Erreur de connexion à Mesinter IA.');}
+    finally{claudeBusy=false;}
+  }
+  reply.pending=false;reply.t=Date.now();
+  saveData();renderAll();
+}
+
+function showLaunch(){
+  if(!S.me)return askProfile(showLaunch);
+  const L=$('launch');
+  const online=S.friends.filter(f=>presence(f.id)==='live').length;
+  const dark=(document.documentElement.dataset.theme||'')==='dark'||(!document.documentElement.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches);
+  const imp=h('input',{type:'file',accept:'.json,application/json',hidden:true});
+  imp.addEventListener('change',()=>importBackup(imp.files[0]));
+  const go=fn=>()=>{L.hidden=true;fn();};
+  const last=S.friends.find(f=>f.id===S.last);
+  const n=S.friends.filter(f=>!f.ai).length;
+  L.replaceChildren(h('div',{class:'lcard'},
+    avatar(S.me.name,S.me.hue,96,null,S.me.photo),
+    h('h2',{text:'Bonjour, '+S.me.name}),
+    h('p',{class:'muted',text:n?(n+' ami'+(n>1?'s':'')+(online?' · '+online+' en ligne':'')):'Aucun ami pour l\'instant'}),
+    h('div',{class:'lbtns'},
+      n?h('button',{class:'primary',text:last?'Reprendre avec '+friendName(last):'Mes conversations',onclick:()=>{if(last){openChat(last.id);}else{L.hidden=true;}}})
+       :h('button',{class:'primary',text:'Ajouter mon premier ami',onclick:go(openAdd)}),
+      n?h('button',{text:'Ajouter un ami',onclick:go(openAdd)}):null,
+      h('button',{text:'Parler à Mesinter IA',onclick:()=>openChat('claude')}),
+      h('button',{text:'Mon profil',onclick:go(openProfile)}),
+      h('button',{text:'Clé API Mesinter IA',onclick:openKeyDialog}),
+      h('button',{text:'Exporter mes données',onclick:exportAll}),
+      h('button',{text:'Importer une sauvegarde',onclick:()=>imp.click()}),
+      h('button',{text:dark?'Passer au thème clair':'Passer au thème sombre',onclick:()=>{
+        const t=dark?'light':'dark';document.documentElement.dataset.theme=t;
+        try{localStorage.setItem('mesinter_theme',t);}catch(e){}
+        showLaunch();
+      }}),
+      h('button',{text:'Aide',onclick:()=>{L.hidden=true;openHelp();}})
+    ),
+    imp,
+    h('button',{class:'ghost danger',text:'Effacer toutes les données',onclick:()=>{
+      if(confirm('Effacer toutes les données de Mesinter sur cet appareil ?')){localStorage.removeItem(KEY);location.reload();}
+    }})
+  ));
+  L.hidden=false;
+}
+
+function openProfile(){
+  const nm=h('input',{value:S.me.name,maxLength:30,placeholder:'Votre nom'});
+  const bio=h('input',{value:S.me.bio||'',maxLength:80,placeholder:'Un petit mot, une humeur…'});
+  const pick=key=>{const i=h('input',{type:'file',accept:'image/*',hidden:true});i.addEventListener('change',async()=>{const f=i.files[0];if(!f)return;try{S.me[key]=key==='photo'?await squarePhoto(f,192):await cropPhoto(f,600,200);saveData();broadcastProfile();renderAll();openProfile();}catch(e){toast('Image non prise en charge');}});return i;};
+  const pp=pick('photo'),pb=pick('banner');
+  const clear=k=>()=>{S.me[k]=null;saveData();broadcastProfile();renderAll();openProfile();};
+  const sw=[null,...HUES].map(a=>h('button',{class:'sw'+(((typeof S.me.accent==='number')?S.me.accent:null)===a?' on':''),'aria-label':a===null?'Couleur par défaut':'Couleur '+a,style:'background:'+(a===null?'linear-gradient(135deg,#7c5cff,#5b8cff)':'hsl('+a+' 85% 62%)'),onclick:()=>{if(a===null)delete S.me.accent;else S.me.accent=a;applyAccent();saveData();broadcastProfile();renderAll();openProfile();}}));
+  openOverlay([header('Mon profil'),pp,pb,profHead(S.me,S.me.name),
+    h('div',{class:'row'},h('button',{text:'Changer la bannière',onclick:()=>pb.click()}),S.me.banner?h('button',{class:'ghost',text:'Retirer',onclick:clear('banner')}):null),
+    h('div',{class:'row'},h('button',{text:'Changer la photo',onclick:()=>pp.click()}),S.me.photo?h('button',{class:'ghost',text:'Retirer',onclick:clear('photo')}):null),
+    h('label',{class:'muted',text:'Votre nom'}),nm,h('label',{class:'muted',text:'Statut'}),bio,
+    h('label',{class:'muted',text:'Couleur'}),h('div',{class:'row'},...sw),
+    h('button',{class:'primary',text:'Enregistrer',onclick:()=>{const v=nm.value.trim();if(!v)return;S.me.name=v;S.me.bio=bio.value.trim().slice(0,80);saveData();broadcastProfile();renderAll();toast('Profil mis à jour');closeOverlay();}}),
+    h('button',{text:'Copier mon identifiant',onclick:()=>copyText(S.me.handle)}),
+    h('hr'),h('div',{class:'row'},h('button',{text:'Exporter',onclick:exportAll}),h('button',{text:'Importer',onclick:()=>{const i=h('input',{type:'file',accept:'.json,application/json'});i.onchange=()=>importBackup(i.files[0]);i.click();}}))]);
+}
+function openMenu(f){
+  if(f.ai)return openAiMenu(f);
+  if(f.group)return openGroupMenu(f);
+  const rename=()=>{
+    const inp=h('input',{value:friendName(f),maxLength:30});
+    openOverlay([header('Renommer'),h('p',{class:'muted',text:'Ce surnom n\'est visible que sur cet appareil.'}),inp,
+      h('button',{class:'primary',text:'Enregistrer',onclick:()=>{const v=inp.value.trim();if(v)S.nick[f.id]=v;saveData();closeOverlay();renderAll();}})]);
+  };
+  openOverlay([header(friendName(f)),
+    h('div',{class:'grid menu'},
+      h('button',{text:'Voir le profil',onclick:()=>openFriendProfile(f)}),
+      h('button',{text:'Renommer',onclick:rename}),
+      h('button',{text:'Copier son identifiant',onclick:()=>copyText(f.handle)}),
+      h('button',{text:'Exporter la conversation (.txt)',onclick:()=>exportChat(f)}),
+      h('button',{text:'Effacer la conversation',onclick:()=>{if(confirm('Effacer tous les messages avec '+friendName(f)+' ?')){S.msgs[f.id]=[];saveData();closeOverlay();renderAll();}}}),
+      h('button',{class:'danger',text:'Retirer cet ami',onclick:()=>{if(confirm('Retirer '+friendName(f)+' et supprimer la conversation ?')){removeFriend(f.id);closeOverlay();$('app').classList.remove('open');}}})
+    )]);
+}
+
+/* ---------- Événements ---------- */
+$('addBtn').onclick=openAdd;
+$('grpBtn').onclick=openNewGroup;
+$('logo').onclick=showLaunch;
+$('profileBtn').onclick=()=>S.me?openProfile():askProfile(openProfile);
+$('back').onclick=()=>$('app').classList.remove('open');
+$('menuBtn').onclick=()=>{const f=S.friends.find(x=>x.id===cur);if(f)openMenu(f);};
+$('chPeer').onclick=()=>{const f=S.friends.find(x=>x.id===cur);if(f)openFriendProfile(f);};
+$('callBtn').onclick=()=>{const f=S.friends.find(x=>x.id===cur);if(f)startCall(f);};
+$('pic').onclick=()=>{if(cur)$('picIn').click();};
+$('picIn').onchange=async()=>{
+  const file=$('picIn').files[0];$('picIn').value='';const f=S.friends.find(x=>x.id===cur);
+  if(!file||!f)return;if(f.group||f.ai)return toast('Photos : discussions entre amis seulement');
+  try{
+    if(file.type==='image/gif'){if(file.size>500000)return toast('GIF trop lourd (500 Ko max)');sendImg(f,await new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=j;fr.readAsDataURL(file);}));}
+    else sendImg(f,await fitPhoto(file,1024));
+  }catch(e){toast('Image non prise en charge');}
+};
+let lastTyp=0;
+$('text').addEventListener('input',()=>{const f=S.friends.find(x=>x.id===cur);if(!f||f.group||f.ai||Date.now()-lastTyp<2500)return;lastTyp=Date.now();const c=connOf(f.id);if(c&&c.dc&&c.dc.readyState==='open')dcSend(c,{type:'typing'});});
+$('q').addEventListener('input',renderSide);
+$('compose').addEventListener('submit',e=>{e.preventDefault();send();});
+$('text').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
+$('text').addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=Math.min(140,e.target.scrollHeight)+'px';});
+$('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeOverlay();});
+addEventListener('keydown',e=>{if(e.key==='Escape')closeOverlay();});
+
+/* ---------- Démarrage ---------- */
+try{const t=localStorage.getItem('mesinter_theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+/* ---------- Groupes : chaque membre est relié directement aux autres membres connectés ---------- */
+function groupMembers(g){return (g.members||[]).filter(u=>u!==S.me.id);}
+function memberFriends(g){return groupMembers(g).map(u=>S.friends.find(x=>x.id===u&&!x.group)).filter(Boolean);}
+function groupOnline(g){return groupMembers(g).filter(u=>{const c=connOf(u);return c&&c.state==='live';}).length;}
+function groupSend(obj,uids){
+  let n=0;
+  for(const u of uids){const c=connOf(u);if(c&&c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify(obj));n++;}catch(e){}}}
+  return n;
+}
+function groupInfoMsg(g){return {type:'groupinfo',g:{id:g.id,name:g.name,hue:g.hue,members:g.members}};}
+function sendGroupsTo(c){
+  if(!c.uid||!c.dc||c.dc.readyState!=='open')return;
+  for(const g of S.friends.filter(f=>f.group&&f.members.includes(c.uid))){
+    try{c.dc.send(JSON.stringify(groupInfoMsg(g)));}catch(e){}
+  }
+}
+function onGroupInfo(uid,g){
+  if(!g||typeof g.id!=='string'||!Array.isArray(g.members))return;
+  if(!g.members.includes(S.me.id)||!g.members.includes(uid))return;
+  const members=g.members.filter(x=>typeof x==='string').slice(0,50);
+  const ex=S.friends.find(x=>x.id===g.id);
+  if(ex){
+    ex.members=members;
+    if(typeof g.name==='string')ex.name=g.name.slice(0,40);
+    if(typeof g.hue==='number')ex.hue=g.hue;
+  }else{
+    S.friends.push({id:g.id,name:typeof g.name==='string'?g.name.slice(0,40):'Groupe',hue:typeof g.hue==='number'?g.hue:200,group:true,members,since:Date.now()});
+    S.msgs[g.id]=S.msgs[g.id]||[];
+  }
+  saveData();renderAll();
+}
+function onGroupLeave(uid,gid){
+  const g=S.friends.find(x=>x.id===gid&&x.group);
+  if(!g||!g.members.includes(uid))return;
+  g.members=g.members.filter(x=>x!==uid);
+  saveData();renderAll();
+}
+function onGroupMsg(uid,m){
+  const g=S.friends.find(x=>x.id===m.g&&x.group);
+  if(!g||!g.members.includes(uid)||typeof m.text!=='string')return;
+  (S.msgs[g.id]=S.msgs[g.id]||[]).push({mine:false,text:m.text.slice(0,4000),t:m.t||Date.now(),from:String(m.from||'').slice(0,30)});
+  if(cur!==g.id)S.unread[g.id]=(S.unread[g.id]||0)+1;
+  saveData();renderAll();
+}
+function sendGroup(g,text){
+  const m={mine:true,text,t:Date.now(),ok:false,from:S.me.name};
+  (S.msgs[g.id]=S.msgs[g.id]||[]).push(m);
+  saveData();
+  m.ok=groupSend({type:'gmsg',g:g.id,text,t:m.t,from:S.me.name},groupMembers(g))>0;
+  saveData();renderAll();
+}
+function removeGroup(gid){
+  S.friends=S.friends.filter(x=>x.id!==gid);
+  delete S.msgs[gid];delete S.unread[gid];delete S.nick[gid];
+  if(cur===gid)cur=null;
+  saveData();renderAll();
+}
+function pickList(items,picks){
+  return h('div',{class:'grid menu'},...items.map(f=>{
+    const b=h('button',{text:friendName(f),onclick:()=>{
+      if(picks.has(f.id)){picks.delete(f.id);b.classList.remove('primary');}
+      else{picks.add(f.id);b.classList.add('primary');}
+    }});
+    return b;
+  }));
+}
+function openNewGroup(){
+  if(!S.me)return askProfile(openNewGroup);
+  const friends=S.friends.filter(f=>!f.group&&!f.ai);
+  if(friends.length<2)return toast('Ajoutez au moins 2 amis pour créer un groupe');
+  const name=h('input',{placeholder:'Nom du groupe',maxLength:40});
+  const picks=new Set();
+  openOverlay([header('Nouveau groupe'),name,
+    h('p',{class:'muted',text:'Choisissez au moins 2 amis. Les messages passent directement entre les membres connectés.'}),
+    pickList(friends,picks),
+    h('button',{class:'primary',text:'Créer le groupe',onclick:()=>{
+      if(picks.size<2)return toast('Choisissez au moins 2 amis');
+      const g={id:'g'+rnd(12),name:(name.value.trim()||'Groupe').slice(0,40),hue:Math.floor(Math.random()*360),group:true,members:[S.me.id,...picks],since:Date.now()};
+      S.friends.push(g);S.msgs[g.id]=[];saveData();
+      groupSend(groupInfoMsg(g),groupMembers(g));
+      closeOverlay();openChat(g.id);
+    }})]);
+  setTimeout(()=>name.focus(),50);
+}
+function openGroupMenu(g){
+  const showMembers=()=>{
+    const rows=[h('div',{class:'row',style:'justify-content:space-between'},h('span',{text:'Vous'}),h('span',{class:'muted',text:S.me.name}))];
+    for(const p of memberFriends(g)){
+      const st=connOf(p.id)&&connOf(p.id).state==='live'?'en ligne':'hors ligne';
+      rows.push(h('div',{class:'row',style:'justify-content:space-between'},h('span',{text:friendName(p)}),h('span',{class:'muted',text:st})));
+    }
+    openOverlay([header('Membres de '+g.name),h('div',{class:'grid'},...rows)]);
+  };
+  const addMembers=()=>{
+    const candidates=S.friends.filter(f=>!f.group&&!f.ai&&!g.members.includes(f.id));
+    if(!candidates.length)return toast('Aucun ami à ajouter');
+    const picks=new Set();
+    openOverlay([header('Ajouter au groupe'),pickList(candidates,picks),
+      h('button',{class:'primary',text:'Ajouter',onclick:()=>{
+        if(!picks.size)return;
+        g.members=[...new Set([...g.members,...picks])];saveData();
+        groupSend(groupInfoMsg(g),groupMembers(g));
+        closeOverlay();renderAll();renderChat();toast('Membres ajoutés');
+      }})]);
+  };
+  const rename=()=>{
+    const inp=h('input',{value:g.name,maxLength:40});
+    openOverlay([header('Renommer le groupe'),inp,
+      h('button',{class:'primary',text:'Enregistrer',onclick:()=>{
+        const v=inp.value.trim();if(!v)return;
+        g.name=v;saveData();groupSend(groupInfoMsg(g),groupMembers(g));
+        closeOverlay();renderAll();renderChat();
+      }})]);
+  };
+  const leave=()=>{
+    if(!confirm('Quitter le groupe « '+g.name+' » ?'))return;
+    groupSend({type:'gleave',g:g.id},groupMembers(g));
+    removeGroup(g.id);closeOverlay();$('app').classList.remove('open');
+  };
+  openOverlay([header(g.name),
+    h('div',{class:'grid menu'},
+      h('button',{text:'Voir les membres',onclick:showMembers}),
+      h('button',{text:'Ajouter des membres',onclick:addMembers}),
+      h('button',{text:'Renommer le groupe',onclick:rename}),
+      h('button',{text:'Exporter la conversation (.txt)',onclick:()=>exportChat(g)}),
+      h('button',{text:'Effacer la conversation',onclick:()=>{if(confirm('Effacer les messages du groupe ?')){S.msgs[g.id]=[];saveData();closeOverlay();renderAll();}}}),
+      h('button',{class:'danger',text:'Quitter le groupe',onclick:leave})
+    )]);
+}
+
+/* ---------- Plein écran et quitter ---------- */
+function fsOn(){return !!(document.fullscreenElement||document.webkitFullscreenElement);}
+function updFs(){const b=$('fsBtn');if(b)b.textContent=fsOn()?'Quitter le plein écran':'Plein écran';}
+function toggleFull(){
+  const nope=()=>toast('Plein écran non disponible sur cet appareil');
+  try{
+    if(fsOn()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);}
+    else{
+      const req=document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen;
+      if(!req)return nope();
+      const p=req.call(document.documentElement);
+      if(p&&p.catch)p.catch(nope);
+    }
+  }catch(e){nope();}
+  setTimeout(updFs,300);
+}
+document.addEventListener('fullscreenchange',updFs);
+document.addEventListener('webkitfullscreenchange',updFs);
+function quitApp(){
+  try{if(fsOn())(document.exitFullscreen||document.webkitExitFullscreen).call(document);}catch(e){}
+  try{window.close();}catch(e){}
+  setTimeout(()=>{
+    document.body.innerHTML='<div style="font:16px system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;padding:24px;text-align:center;background:#0b0d12;color:#e8eaf0"><div>Mesinter est fermé.<br><br><a href="." style="color:#8ab4ff">Rouvrir Mesinter</a><br><br>Vous pouvez aussi fermer cet onglet.<br>Vos conversations sont conservées sur cet appareil.</div></div>';
+  },250);
+}
+$('fsBtn').onclick=toggleFull;
+$('quitBtn').onclick=quitApp;
+updFs();
+
+ensureClaude();
+for(const f of S.friends)relaySub(f);
+startInbox();
+const flushAll=()=>{for(const f of S.friends)if(!f.group&&!f.ai)flushPending(f.id);reconnectAll();};
+addEventListener('online',flushAll);document.addEventListener('visibilitychange',()=>{if(!document.hidden)flushAll();});
+applyAccent();
+renderAll();
+if(!S.me)askProfile(showLaunch);else showLaunch();
+if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
