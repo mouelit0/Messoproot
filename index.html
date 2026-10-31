@@ -1770,6 +1770,7 @@ async function relaySub(f){
       const a=unb64(d.message);
       const p=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:a.slice(0,12)},await ckey(f),a.slice(12))));
       (S.rs=S.rs||{})[f.id]=d.time;
+      if(p.pt){if(p.from!==S.me.id){if(p.pt==='post')onPost(f.id,p);else if(p.pt==='pdel'){S.posts=(S.posts||[]).filter(x=>!(x.id===p.id&&x.uid===f.id));saveData();renderForum();}}return;}
       if(p.sig){onSig(f,p);return;}
       if(p.del&&p.from!==S.me.id){delMsg(f.id,p.del);return;}
       if(p.from===S.me.id||typeof p.text!=='string')return;
@@ -1807,7 +1808,7 @@ function sendDel(f,mid){
   if(c&&c.dc&&c.dc.readyState==='open')try{c.dc.send(JSON.stringify({type:'del',id:mid}));}catch(e){}
   if(CAN_RELAY&&f.key)relayRaw(f,{del:mid,from:S.me.id}).catch(()=>{});
 }
-function fitPhoto(file,max){return new Promise((res,rej)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const k=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',.7));};img.onerror=()=>{URL.revokeObjectURL(url);rej();};img.src=url;});}
+function fitPhoto(file,max,q){return new Promise((res,rej)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const k=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',q||.7));};img.onerror=()=>{URL.revokeObjectURL(url);rej();};img.src=url;});}
 function sendImg(f,u){
   const c=connOf(f.id);
   if(!(c&&c.dc&&c.dc.readyState==='open'))return toast('Connexion directe requise pour envoyer une photo');
@@ -2015,7 +2016,7 @@ function onHave(uid,m){
   ids.forEach(id=>{if(!mineIds.has(id))dcSend(c,{type:'pdel',id});});
 }
 function onPost(uid,m){
-  if(typeof m.id!=='string'||m.id.length>20||!(m.n>=1&&m.n<=60)||typeof m.d!=='string')return;
+  if(typeof m.id!=='string'||m.id.length>20||!(m.n>=1&&m.n<=80)||typeof m.d!=='string')return;
   S.posts=S.posts||[];
   if(S.posts.some(p=>p.id===m.id))return;
   const b=postBuf[m.id]=postBuf[m.id]||{p:[],k:0,t:m.t,text:''};
@@ -2032,8 +2033,14 @@ function onPost(uid,m){
 function publishPost(text,img){
   const p={id:rnd(10),uid:S.me.id,name:S.me.name,hue:S.me.hue,text,img:img||null,t:Date.now()};
   S.posts=S.posts||[];S.posts.push(p);trimPosts();saveData();
+  const live=new Set(conLive().map(c=>c.uid));let sent=live.size;
   conLive().forEach(c=>sendPost(c,p));
-  renderForum();toast('Publié');
+  if(CAN_RELAY)S.friends.filter(f=>f.key&&!f.group&&!f.ai&&!live.has(f.id)).forEach(f=>{sent++;relayPost2(f,p);});
+  renderForum();toast(sent?'Publié, envoyé à '+sent+' ami'+(sent>1?'s':''):'Publié, aucun ami joignable pour l\'instant');
+}
+async function relayPost2(f,p){
+  const d=p.img||'',n=Math.max(1,Math.ceil(d.length/2100));
+  for(let i=0;i<n;i++){try{await relayRaw(f,{pt:'post',from:S.me.id,id:p.id,t:p.t,text:i?undefined:p.text,n,i,d:d.slice(i*2100,(i+1)*2100)});}catch(e){return;}}
 }
 function postEl(p){
   const mine=p.uid===S.me.id,f=S.friends.find(x=>x.id===p.uid);
@@ -2041,7 +2048,7 @@ function postEl(p){
   return h('article',{class:'post'},
     h('div',{class:'ph'},avatar(nm,a.hue,40,null,a.photo),
       h('div',{class:'grow'},h('b',{text:nm}),h('div',{class:'muted',text:new Date(p.t).toLocaleString('fr-CA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})})),
-      mine?h('button',{class:'ghost',text:'🗑',onclick:()=>{if(!confirm('Supprimer ce Mainz ?'))return;S.posts=S.posts.filter(x=>x!==p);saveData();conLive().forEach(c=>dcSend(c,{type:'pdel',id:p.id}));renderForum();}}):null),
+      mine?h('button',{class:'ghost',text:'🗑',onclick:()=>{if(!confirm('Supprimer ce Mainz ?'))return;S.posts=S.posts.filter(x=>x!==p);saveData();conLive().forEach(c=>dcSend(c,{type:'pdel',id:p.id}));if(CAN_RELAY)S.friends.filter(f=>f.key).forEach(f=>relayRaw(f,{pt:'pdel',from:S.me.id,id:p.id}).catch(()=>{}));renderForum();}}):null),
     p.img?h('img',{class:'pimg',src:p.img,alt:'photo',onclick:()=>openOverlay([header('Photo'),h('img',{src:p.img,style:'width:100%;border-radius:14px'})])}):null,
     p.text?h('div',{class:'pt',text:p.text}):null);
 }
@@ -2057,7 +2064,7 @@ function openPost(){
   const file=h('input',{type:'file',accept:'image/*',hidden:true});
   const tx=h('textarea',{placeholder:'Écris ton Mainz…',maxLength:500,rows:4});
   const err=h('div',{class:'err'});
-  file.addEventListener('change',async()=>{const f=file.files[0];if(!f)return;try{img=await fitPhoto(f,720);prev.src=img;prev.style.display='block';}catch(e){err.textContent='Image non prise en charge';}});
+  file.addEventListener('change',async()=>{const f=file.files[0];if(!f)return;try{img=await fitPhoto(f,560,.55);if(img.length>160000){img=null;err.textContent='Photo trop lourde, choisis-en une autre.';return;}prev.src=img;prev.style.display='block';}catch(e){err.textContent='Image non prise en charge';}});
   openOverlay([header('Nouveau Mainz'),prev,file,h('button',{text:'📷 Ajouter une photo',onclick:()=>file.click()}),tx,
     h('button',{class:'primary',text:'Publier',onclick:()=>{const t=tx.value.trim();if(!t&&!img){err.textContent='Ajoute une photo ou du texte.';return;}publishPost(t,img);closeOverlay();}}),err]);
 }
