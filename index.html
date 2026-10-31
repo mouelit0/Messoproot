@@ -1761,11 +1761,11 @@ const inflight=new Set();
 function trySend(uid,m){
   if(!m.id)m.id=rnd(10);
   const c=connOf(uid);
-  if(c&&c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify({text:m.text,t:m.t,id:m.id,em:m.em,mg:S.me.mg}));m.ok=true;saveData();return;}catch(e){}}
+  if(c&&c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify({text:m.text,t:m.t,id:m.id,em:m.em,mg:S.me.mg,nt:S.me.nt}));m.ok=true;saveData();return;}catch(e){}}
   const f=S.friends.find(x=>x.id===uid);
   if(CAN_RELAY&&f&&f.key&&m.text.length<2000&&!inflight.has(m.id)){
     inflight.add(m.id);
-    relaySend(f,m).then(ok=>{if(ok){m.ok=true;saveData();renderAll();}}).catch(()=>{}).finally(()=>inflight.delete(m.id));
+    relaySend(f,m).then(ok=>{if(ok){m.ok=true;saveData();renderAll();pingFriend(f);}}).catch(()=>{}).finally(()=>inflight.delete(m.id));
   }
 }
 function flushPending(id){for(const m of S.msgs[id]||[])if(m.mine&&!m.ok)trySend(id,m);saveData();}
@@ -1775,7 +1775,7 @@ const b64=u=>{let t='';for(const x of u)t+=String.fromCharCode(x);return btoa(t)
 const unb64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
 async function ckey(f){return keyCache[f.key]||(keyCache[f.key]=await crypto.subtle.importKey('raw',unb64(f.key),'AES-GCM',false,['encrypt','decrypt']));}
 async function ftopic(f){const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('t'+f.key));return 'mesinter-m-'+Array.from(new Uint8Array(d).slice(0,12),x=>x.toString(16).padStart(2,'0')).join('');}
-const relaySend=(f,m)=>relayRaw(f,{id:m.id,from:S.me.id,text:m.text,t:m.t,mg:S.me.mg});
+const relaySend=(f,m)=>relayRaw(f,{id:m.id,from:S.me.id,text:m.text,t:m.t,mg:S.me.mg,nt:S.me.nt});
 async function relayRaw(f,o){
   const iv=crypto.getRandomValues(new Uint8Array(12));
   const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},await ckey(f),new TextEncoder().encode(JSON.stringify(o))));
@@ -1799,7 +1799,7 @@ async function relaySub(f){
       if(p.sig){onSig(f,p);return;}
       if(p.del&&p.from!==S.me.id){delMsg(f.id,p.del);return;}
       if(p.from===S.me.id||typeof p.text!=='string')return;
-      receive(f.id,{text:p.text,t:p.t,id:p.id});
+      receive(f.id,{text:p.text,t:p.t,id:p.id,mg:p.mg,nt:p.nt});
     }catch(e){}
   };
 }
@@ -2059,7 +2059,7 @@ function publishPost(text,img){
   S.posts=S.posts||[];S.posts.push(p);trimPosts();saveData();
   const live=new Set(conLive().map(c=>c.uid));let sent=live.size;
   conLive().forEach(c=>sendPost(c,p));
-  if(CAN_RELAY)S.friends.filter(f=>f.key&&!f.group&&!f.ai&&!live.has(f.id)).forEach(f=>{sent++;relayPost2(f,p);});
+  if(CAN_RELAY)S.friends.filter(f=>f.key&&!f.group&&!f.ai&&!live.has(f.id)).forEach(f=>{sent++;relayPost2(f,p);pingFriend(f,'Nouveau Mainz de '+S.me.name);});
   renderForum();toast(sent?'Publié, envoyé à '+sent+' ami'+(sent>1?'s':''):'Publié, aucun ami joignable pour l\'instant');
 }
 async function relayPost2(f,p){
@@ -2266,7 +2266,33 @@ function openWallpaper(f){
     h('div',{class:'egrid',style:'grid-template-columns:repeat(auto-fill,minmax(88px,1fr))'},...WPS.map(w=>h('button',{class:'ghost',style:'height:120px;border-radius:16px;padding:0;position:relative;overflow:hidden;background:'+(w.bg||'var(--card)')+';outline:'+(cur.id===w.id?'3px solid var(--accent)':'1px solid var(--line)'),onclick:()=>set({id:w.id})},h('small',{style:'position:absolute;left:0;right:0;bottom:0;padding:4px;background:rgba(0,0,0,.45);color:#fff;font-size:11px',text:w.n})))),
     file,h('button',{text:'Importer une image',onclick:()=>file.click()}),err]);
 }
-function profileMsg(){return {type:'profile',name:S.me.name,hue:S.me.hue,photo:S.me.photo||null,bio:S.me.bio||'',accent:typeof S.me.accent==='number'?S.me.accent:null};}
+/* ---------- Notifications ---------- */
+const pingAt={};
+function setNt(uid,t){const f=S.friends.find(x=>x.id===uid);if(f&&/^[A-Za-z0-9]{16,40}$/.test(t)&&f.nt!==t){f.nt=t;saveData();}}
+function pingFriend(f,text){
+  if(!f.nt||Date.now()-(pingAt[f.id]||0)<20000)return;pingAt[f.id]=Date.now();
+  fetch('https://ntfy.sh/mesinter-n-'+f.nt,{method:'POST',headers:{Title:'Mesinter',Tags:'speech_balloon',Priority:'high',Click:location.href.split('#')[0]},body:text||('Nouveau message de '+S.me.name)}).catch(()=>{});
+}
+function notifyLocal(uid,text){
+  if(!window.Notification||Notification.permission!=='granted'||!document.hidden||!navigator.serviceWorker)return;
+  const f=S.friends.find(x=>x.id===uid);if(!f)return;
+  navigator.serviceWorker.ready.then(r=>r.showNotification(friendName(f),{body:String(text).slice(0,120),tag:'m-'+uid,icon:'icon-192.png'})).catch(()=>{});
+}
+function openNotifs(){
+  if(!S.me.nt){S.me.nt=rnd(20).toLowerCase();saveData();}
+  const topic='mesinter-n-'+S.me.nt,perm=window.Notification?Notification.permission:'indisponible';
+  openOverlay([header('Notifications'),
+    h('p',{text:'1. Quand l\'appli est ouverte en arrière-plan'}),
+    h('button',{text:perm==='granted'?'Autorisées ✓':'Autoriser les notifications',onclick:async()=>{if(window.Notification){await Notification.requestPermission();openNotifs();}}}),
+    h('hr'),h('p',{text:'2. Quand l\'appli est fermée'}),
+    h('p',{class:'muted',text:'Installe l\'appli gratuite ntfy (Android ou iPhone), puis abonne-la à ton sujet privé ci-dessous. Tes amis déclenchent alors une notification chez toi quand ils t\'écrivent. Elle indique seulement qui t\'écrit, pas le message.'}),
+    h('div',{class:'codebig',style:'font-size:14px;letter-spacing:0;word-break:break-all',text:topic,onclick:()=>copyText(topic)}),
+    h('button',{class:'primary',text:'Ouvrir dans ntfy',onclick:()=>{location.href='ntfy://ntfy.sh/'+topic;}}),
+    h('button',{text:'Copier le nom du sujet',onclick:()=>copyText(topic)}),
+    h('button',{text:'Envoyer une notification test',onclick:()=>fetch('https://ntfy.sh/'+topic,{method:'POST',headers:{Title:'Mesinter',Tags:'tada'},body:'Test réussi !'}).then(()=>toast('Test envoyé')).catch(()=>toast('Échec'))}),
+    h('p',{class:'muted',text:'Android : Play Store ou F-Droid, cherche « ntfy ». iPhone : App Store, cherche « ntfy ». Dans ntfy, appuie sur +, serveur par défaut, colle le nom du sujet.'})]);
+}
+function profileMsg(){return {type:'profile',name:S.me.name,hue:S.me.hue,photo:S.me.photo||null,bio:S.me.bio||'',nt:S.me.nt||null,accent:typeof S.me.accent==='number'?S.me.accent:null};}
 function bannerMsg(){return {type:'banner',banner:S.me.banner||null};}
 function sendProfile(c){if(c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify(profileMsg()));c.dc.send(JSON.stringify(bannerMsg()));}catch(e){}}}
 function broadcastProfile(){for(const k of Object.keys(conns))sendProfile(conns[k]);}
@@ -2275,7 +2301,7 @@ function applyProfile(uid,m){
   if(typeof m.name==='string'&&m.name.trim())f.name=m.name.trim().slice(0,30);
   if(typeof m.hue==='number')f.hue=m.hue;
   f.photo=(typeof m.photo==='string'&&m.photo.startsWith('data:image/')&&m.photo.length<200000)?m.photo:null;
-  f.bio=typeof m.bio==='string'?m.bio.slice(0,80):'';f.accent=typeof m.accent==='number'?m.accent:null;
+  f.bio=typeof m.bio==='string'?m.bio.slice(0,80):'';if(typeof m.nt==='string'&&/^[A-Za-z0-9]{16,40}$/.test(m.nt))f.nt=m.nt;f.accent=typeof m.accent==='number'?m.accent:null;
   saveData();renderAll();
 }
 function applyBanner(uid,m){const f=S.friends.find(x=>x.id===uid);if(!f)return;f.banner=(typeof m.banner==='string'&&m.banner.startsWith('data:image/')&&m.banner.length<150000)?m.banner:null;saveData();renderAll();}
@@ -2298,10 +2324,12 @@ function receive(id,m){
   if(m&&m.type==='gleave'){onGroupLeave(id,m.g);return;}
   if(m&&m.type==='gmsg'){onGroupMsg(id,m);return;}
   if(typeof m.text!=='string')return;
+  if(typeof m.nt==='string')setNt(id,m.nt);
   if(m.id){const l=((S.seen=S.seen||{})[id]=S.seen[id]||[]);if(l.includes(m.id))return;l.push(m.id);if(l.length>300)l.shift();}
   delete typing[id];
   (S.msgs[id]=S.msgs[id]||[]).push({mine:false,id:typeof m.id==='string'?m.id.slice(0,20):undefined,em:cleanEm(m.em),text:m.text.slice(0,4000),t:m.t||Date.now()});
   if(cur===id&&!document.hidden)playSend(MGIDS.includes(m.mg)?m.mg:null);
+  else notifyLocal(id,m.text);
   if(cur!==id)S.unread[id]=(S.unread[id]||0)+1;
   saveData();renderAll();
 }
@@ -2729,6 +2757,7 @@ function showLaunch(){
       h('button',{text:'Parler à Mesinter IA',onclick:()=>openChat('claude')}),
       h('button',{text:'Mon profil',onclick:go(openProfile)}),
       h('button',{text:'Mainz',onclick:go(openForum)}),
+      h('button',{text:'Notifications',onclick:go(openNotifs)}),
       h('button',{text:S.acct?'Compte : '+S.acct.name:'Compte et connexion',onclick:go(openAccount)}),
       h('button',{text:'Mes émojis perso',onclick:go(openEmojis)}),
       h('button',{text:'Clé API Mesinter IA',onclick:openKeyDialog}),
@@ -2988,6 +3017,7 @@ startInbox();
 const flushAll=()=>{for(const f of S.friends)if(!f.group&&!f.ai)flushPending(f.id);reconnectAll();};
 addEventListener('online',flushAll);document.addEventListener('visibilitychange',()=>{if(!document.hidden)flushAll();});
 document.body.classList.add('boot');setTimeout(()=>document.body.classList.remove('boot'),1600);
+if(S.me&&!S.me.nt){S.me.nt=rnd(20).toLowerCase();saveData();}
 buildForum();
 applyAccent();
 renderAll();
