@@ -1872,7 +1872,7 @@ async function startCall(f){
   const st=await mic(c);if(!st)return;
   call={c,st,f,role:'out'};
   showCall('out',f);
-  dcSend(c,{type:'call',a:'ring'});
+  dcSend(c,{type:'call',a:'ring'});pingFriend(f,'Appel de '+S.me.name);
 }
 function onCall(uid,m){
   const c=connOf(uid),f=S.friends.find(x=>x.id===uid);if(!c||!f)return;
@@ -2181,7 +2181,7 @@ function openAccount(){
 let cuiT=null,cuiRaf=0,cuiAn={};
 function lvl(an){const d=new Uint8Array(an.fftSize);an.getByteTimeDomainData(d);let t=0;for(const v of d){const x=(v-128)/128;t+=x*x;}return Math.min(1,Math.sqrt(t/d.length)*3.2);}
 function mkAn(ctx,stream){try{const an=ctx.createAnalyser();an.fftSize=256;ctx.createMediaStreamSource(stream).connect(an);return an;}catch(e){return null;}}
-function closeCallUi(){const e=$('callui');if(e)e.remove();cancelAnimationFrame(cuiRaf);clearInterval(cuiT);cuiAn={};}
+function closeCallUi(){stopRing();const e=$('callui');if(e)e.remove();cancelAnimationFrame(cuiRaf);clearInterval(cuiT);cuiAn={};}
 function floatReact(e){const W=innerWidth,H=innerHeight;fxPart(e,W*(.2+Math.random()*.6),H-170,[{transform:'translateY(0) scale(.6)',opacity:0},{opacity:1,offset:.2},{transform:'translateY('+(-H*.45)+'px) scale(1.3)',opacity:0}],{duration:1800},36);}
 async function answerCall(){
   if(!call)return;const c=call.c,f=call.f,st=await mic(c);
@@ -2190,6 +2190,7 @@ async function answerCall(){
 }
 function showCall(mode,f){
   closeCallUi();if(!call)return;
+  if(mode==='in')startRing();
   const nm=friendName(f),ui=h('div',{});ui.id='callui';
   if(!call.ctx){try{call.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}
   if(call.ctx&&call.ctx.resume)call.ctx.resume();
@@ -2291,6 +2292,30 @@ function openNotifs(){
     h('button',{text:'Copier le nom du sujet',onclick:()=>copyText(topic)}),
     h('button',{text:'Envoyer une notification test',onclick:()=>fetch('https://ntfy.sh/'+topic,{method:'POST',headers:{Title:'Mesinter',Tags:'tada'},body:'Test réussi !'}).then(()=>toast('Test envoyé')).catch(()=>toast('Échec'))}),
     h('p',{class:'muted',text:'Android : Play Store ou F-Droid, cherche « ntfy ». iPhone : App Store, cherche « ntfy ». Dans ntfy, appuie sur +, serveur par défaut, colle le nom du sujet.'})]);
+}
+/* ---------- Sonnerie d'appel ---------- */
+let ringEl=null,ringSyn=null,ringVib=null;
+function synthRing(){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();if(ctx.resume)ctx.resume();
+    const notes=[659.25,783.99,880,1046.5,880,783.99];
+    const play=()=>{const t=ctx.currentTime;notes.forEach((fr,k)=>{const o=ctx.createOscillator(),g=ctx.createGain(),a=t+k*.22;o.type='sine';o.frequency.value=fr;g.gain.setValueAtTime(0,a);g.gain.linearRampToValueAtTime(.25,a+.03);g.gain.exponentialRampToValueAtTime(.001,a+.4);o.connect(g);g.connect(ctx.destination);o.start(a);o.stop(a+.45);});};
+    play();ringSyn={ctx,iv:setInterval(play,2400)};
+  }catch(e){}
+}
+function startRing(){
+  stopRing();
+  const a=new Audio(),list=['ringtone.mp3','ringtone.wav','ringtone.ogg','ringtone.m4a'];let i=0;
+  a.loop=true;ringEl=a;
+  const next=()=>{if(i>=list.length){a.onerror=null;synthRing();return;}a.src=list[i++];a.play().catch(()=>{});};
+  a.onerror=next;next();
+  if(navigator.vibrate){navigator.vibrate([500,250,500]);ringVib=setInterval(()=>navigator.vibrate([500,250,500]),3000);}
+}
+function stopRing(){
+  if(ringEl){ringEl.onerror=null;ringEl.pause();ringEl.removeAttribute('src');ringEl=null;}
+  if(ringSyn){clearInterval(ringSyn.iv);try{ringSyn.ctx.close();}catch(e){}ringSyn=null;}
+  if(ringVib){clearInterval(ringVib);ringVib=null;}
+  if(navigator.vibrate)navigator.vibrate(0);
 }
 function profileMsg(){return {type:'profile',name:S.me.name,hue:S.me.hue,photo:S.me.photo||null,bio:S.me.bio||'',nt:S.me.nt||null,accent:typeof S.me.accent==='number'?S.me.accent:null};}
 function bannerMsg(){return {type:'banner',banner:S.me.banner||null};}
