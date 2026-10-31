@@ -1795,7 +1795,7 @@ async function relaySub(f){
       const a=unb64(d.message);
       const p=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:a.slice(0,12)},await ckey(f),a.slice(12))));
       (S.rs=S.rs||{})[f.id]=d.time;
-      if(p.pt){if(p.from!==S.me.id){if(p.pt==='post')onPost(f.id,p);else if(p.pt==='pdel'){S.posts=(S.posts||[]).filter(x=>!(x.id===p.id&&x.uid===f.id));saveData();renderForum();}}return;}
+      if(p.pt){if(p.from!==S.me.id){if(p.pt==='post')onPost(f.id,p);else if(p.pt==='wp')onWp(f.id,p);else if(p.pt==='wpimg')onWpImg(f.id,p);else if(p.pt==='pdel'){S.posts=(S.posts||[]).filter(x=>!(x.id===p.id&&x.uid===f.id));saveData();renderForum();}}return;}
       if(p.sig){onSig(f,p);return;}
       if(p.del&&p.from!==S.me.id){delMsg(f.id,p.del);return;}
       if(p.from===S.me.id||typeof p.text!=='string')return;
@@ -2219,6 +2219,53 @@ function showCall(mode,f){
     loop();
   }
 }
+/* ---------- Fonds d'écran partagés ---------- */
+const WPS=[
+ {id:'none',n:'Aucun',bg:''},
+ {id:'aurore',n:'Aurore',bg:'linear-gradient(160deg,#4b2fd6,#2f7bff 60%,#27c9b8)'},
+ {id:'coucher',n:'Coucher de soleil',bg:'linear-gradient(170deg,#ff7a59,#c93a8f 55%,#4a2a82)'},
+ {id:'ocean',n:'Océan',bg:'linear-gradient(180deg,#0f4c81,#1a8fb4 60%,#7fdbd0)'},
+ {id:'foret',n:'Forêt',bg:'linear-gradient(170deg,#0f3d2e,#1f7a54 60%,#9ad17a)'},
+ {id:'bonbon',n:'Bonbon',bg:'linear-gradient(160deg,#ff9ad5,#b490ff 60%,#7cc8ff)'},
+ {id:'soleil',n:'Soleil',bg:'radial-gradient(circle at 80% 15%,#fff3b0,#ffc857 18%,transparent 45%),linear-gradient(180deg,#ffb36b,#ff7e5f)'},
+ {id:'brume',n:'Brume',bg:'linear-gradient(180deg,#e9edff,#cdd7ff)'},
+ {id:'nuit',n:'Nuit étoilée',bg:'radial-gradient(circle at 20% 20%,rgba(255,255,255,.9) 0 1px,transparent 2px) 0 0/90px 90px,radial-gradient(circle at 70% 60%,rgba(255,255,255,.7) 0 1px,transparent 2px) 0 0/60px 60px,#0b1030'},
+ {id:'points',n:'Points',bg:'radial-gradient(rgba(124,92,255,.4) 1.5px,transparent 2px) 0 0/22px 22px,#12141f'},
+ {id:'grille',n:'Grille',bg:'linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px) 0 0/28px 28px,#101322'},
+ {id:'doodle',n:'Doodle',bg:`url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><g fill='none' stroke='%23ffffff' stroke-opacity='.14' stroke-width='2'><circle cx='18' cy='20' r='7'/><path d='M52 12v14M45 19h14'/><path d='M20 58l8 12h-16z'/><path d='M56 56q6-10 12 0t12 0'/></g></svg>") 0 0/80px 80px,#141729`}];
+const wpBuf={};
+function wpCss(w){if(!w)return '';if(w.pic)return 'center/cover url('+w.pic+')';const p=WPS.find(x=>x.id===w.id);return p?p.bg:'';}
+function applyWp(box,f){box.style.background=wpCss((S.wp||{})[f.id]);}
+function sendWp(f,wp){
+  const live=conLive().find(c=>c.uid===f.id);
+  if(wp.id){if(live)dcSend(live,{type:'wp',id:wp.id});else if(CAN_RELAY&&f.key)relayRaw(f,{pt:'wp',from:S.me.id,id:wp.id}).catch(()=>{});return;}
+  const d=wp.pic,tid=rnd(8);
+  if(live){const n=Math.ceil(d.length/15000);for(let i=0;i<n;i++)dcSend(live,{type:'wpimg',tid,n,i,d:d.slice(i*15000,(i+1)*15000)});}
+  else if(CAN_RELAY&&f.key){const n=Math.ceil(d.length/2100);(async()=>{for(let i=0;i<n;i++){try{await relayRaw(f,{pt:'wpimg',from:S.me.id,tid,n,i,d:d.slice(i*2100,(i+1)*2100)});}catch(e){return;}}})();}
+}
+function onWp(uid,m){if(typeof m.id==='string'&&WPS.some(w=>w.id===m.id)){(S.wp=S.wp||{})[uid]={id:m.id};saveData();renderAll();}}
+function onWpImg(uid,m){
+  if(typeof m.tid!=='string'||m.tid.length>20||!(m.n>=1&&m.n<=80)||typeof m.d!=='string')return;
+  const b=wpBuf[m.tid]=wpBuf[m.tid]||{p:[],k:0};
+  if(b.p[m.i]===undefined){b.p[m.i]=m.d;b.k++;}
+  if(b.k<m.n)return;delete wpBuf[m.tid];
+  const d=b.p.join('');if(!d.startsWith('data:image/')||d.length>170000)return;
+  (S.wp=S.wp||{})[uid]={pic:d};saveData();renderAll();toast('Nouveau fond d\'écran de la conversation');
+}
+function openWallpaper(f){
+  const shared=!f.group&&!f.ai,cur=(S.wp||{})[f.id]||{id:'none'};
+  const set=wp=>{(S.wp=S.wp||{})[f.id]=wp;saveData();if(shared)sendWp(f,wp);renderAll();toast(shared?'Fond d\'écran changé pour vous deux':'Fond d\'écran changé');openWallpaper(f);};
+  const file=h('input',{type:'file',accept:'image/*',hidden:true}),err=h('div',{class:'err'});
+  file.addEventListener('change',async()=>{
+    const x=file.files[0];file.value='';if(!x)return;
+    try{let d=await fitPhoto(x,900,.55);if(d.length>160000)d=await fitPhoto(x,700,.45);if(d.length>160000){err.textContent='Image trop lourde.';return;}set({pic:d});}
+    catch(e){err.textContent='Image non prise en charge';}
+  });
+  openOverlay([header('Fond d\'écran'),
+    h('p',{class:'muted',text:shared?'Le fond que tu choisis s\'applique aussi chez '+friendName(f)+'.':'Choisis le fond de cette discussion.'}),
+    h('div',{class:'egrid',style:'grid-template-columns:repeat(auto-fill,minmax(88px,1fr))'},...WPS.map(w=>h('button',{class:'ghost',style:'height:120px;border-radius:16px;padding:0;position:relative;overflow:hidden;background:'+(w.bg||'var(--card)')+';outline:'+(cur.id===w.id?'3px solid var(--accent)':'1px solid var(--line)'),onclick:()=>set({id:w.id})},h('small',{style:'position:absolute;left:0;right:0;bottom:0;padding:4px;background:rgba(0,0,0,.45);color:#fff;font-size:11px',text:w.n})))),
+    file,h('button',{text:'Importer une image',onclick:()=>file.click()}),err]);
+}
 function profileMsg(){return {type:'profile',name:S.me.name,hue:S.me.hue,photo:S.me.photo||null,bio:S.me.bio||'',accent:typeof S.me.accent==='number'?S.me.accent:null};}
 function bannerMsg(){return {type:'banner',banner:S.me.banner||null};}
 function sendProfile(c){if(c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify(profileMsg()));c.dc.send(JSON.stringify(bannerMsg()));}catch(e){}}}
@@ -2237,6 +2284,8 @@ function receive(id,m){
   if(m&&m.type==='del'){delMsg(id,m.id);return;}
   if(m&&m.type==='img'){onImg(id,m);return;}
   if(m&&m.type==='call'){onCall(id,m);return;}
+  if(m&&m.type==='wp'){onWp(id,m);return;}
+  if(m&&m.type==='wpimg'){onWpImg(id,m);return;}
   if(m&&m.type==='react'){if(call&&['🔥','😂','❤️','👏','🎉'].includes(m.e))floatReact(m.e);return;}
   if(m&&m.type==='sdp'){onSdp(id,m);return;}
   if(m&&m.type==='profile'){applyProfile(id,m);return;}
@@ -2327,6 +2376,7 @@ function renderChat(){
       h('div',{class:'t'},h('span',{text:timeLabel(m.t)+tick}))
     ));
   }
+  applyWp(box,f);
   seenN[f.id]=msgs.length;
   if(typing[f.id]&&Date.now()-typing[f.id]<4000)box.append(h('div',{class:'bub typing'+(typingMg[f.id]?' mg-'+typingMg[f.id]:''),title:'écrit…'},h('i'),h('i'),h('i'),...mgDeco(typingMg[f.id])));
   if(!f.group&&!f.ai&&p!=='live')box.append(h('div',{class:'notice'},h('span',{text:p==='attente'?'Connexion en cours…':(f.key&&CAN_RELAY?'Connexion directe coupée : les messages passent par le relais (Internet requis).':'Hors ligne : tes messages partiront dès que la connexion revient.')}),p==='attente'?null:h('button',{class:'primary',text:'Reconnecter',onclick:openAdd})));
@@ -2727,6 +2777,7 @@ function openMenu(f){
   openOverlay([header(friendName(f)),
     h('div',{class:'grid menu'},
       h('button',{text:'Voir le profil',onclick:()=>openFriendProfile(f)}),
+      h('button',{text:'Fond d\'écran',onclick:()=>openWallpaper(f)}),
       h('button',{text:'Renommer',onclick:rename}),
       h('button',{text:'Copier son identifiant',onclick:()=>copyText(f.handle)}),
       h('button',{text:'Exporter la conversation (.txt)',onclick:()=>exportChat(f)}),
