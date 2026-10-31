@@ -279,6 +279,33 @@ button:active{transform:scale(.94)}
 .cbtn.red span{display:inline-block;transform:rotate(135deg)}
 .cpick{display:none;gap:4px;background:rgba(255,255,255,.14);backdrop-filter:blur(10px);padding:6px;border-radius:30px;margin-bottom:38px}.cpick.on{display:flex}
 .cpick button{min-height:0;font-size:26px;padding:6px 10px}
+/* ---------- Appel : version "bulles" ---------- */
+#callui.c2{background:#fff;padding:0;display:block;color:#111;font-family:system-ui,sans-serif}
+#callui.c2::before,#callui.c2::after{display:none}
+.c2 .cdots{position:absolute;inset:0;pointer-events:none}
+.cdot{position:absolute;border-radius:50%;background:radial-gradient(circle at 32% 30%,#6a6aff,#0a0ae6);box-shadow:0 .8vw 2vw rgba(0,0,230,.25);transform:translate(-50%,-50%) scale(calc(1 + var(--lv,0)*.32));animation:drift 5s ease-in-out infinite alternate}
+@keyframes drift{from{translate:0 -1.6vw}to{translate:0 1.6vw}}
+.cc{position:absolute;border-radius:50%;background:radial-gradient(circle at 30% 30%,#ac63d8,#7a2ea5);box-shadow:0 0 0 6px #fff,0 0 0 9px var(--rc,#111),0 0 calc(10px + var(--lv,0)*70px) calc(var(--lv,0)*22px) var(--gc,transparent);transition:box-shadow .1s linear}
+.cc.speak{--rc:#4b3bff;--gc:rgba(91,75,255,.8)}
+.cc.friend{left:-7vw;top:-9vw;width:48vw;height:48vw}
+.cc.me{right:-13vw;bottom:-14vw;width:56vw;height:56vw}
+.cc>.av{width:100%!important;height:100%!important;border-radius:50%;box-shadow:none!important}
+.cc.ringing{animation:ringc 1.4s ease-in-out infinite}
+@keyframes ringc{50%{transform:scale(1.04)}}
+.cv{display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;background:#000}
+.cc.hasvid .cv{display:block}.cv.m{transform:scaleX(-1)}
+.c2 .cn{position:absolute;left:68%;top:7%;transform:translateX(-50%);text-align:center;width:50vw}
+.c2 .cn b{display:block;font-size:24px;letter-spacing:-.01em}.c2 .cn span{opacity:.6;font-variant-numeric:tabular-nums}
+.ctl{position:absolute;transform:translate(-50%,-50%);display:grid;justify-items:center;gap:4px;background:none;border:0;color:#111;font:700 17px system-ui,sans-serif;padding:8px;min-height:0;cursor:pointer;transition:color .2s}
+.ctl svg{width:58px;height:58px;transition:transform .15s}
+.ctl:active svg{transform:scale(.8)}
+.ctl.pop svg{animation:popb .45s cubic-bezier(.2,.9,.3,1.4)}
+@keyframes popb{0%{transform:scale(.7) rotate(-12deg)}60%{transform:scale(1.22) rotate(6deg)}100%{transform:none}}
+.ctl.on{color:#1414ff}.ctl .sl{display:none}.ctl.off{color:#e0245e}.ctl.off .sl{display:inline}
+.ctl.hang,.ctl.ans{width:84px;height:84px;border-radius:50%;padding:0;place-items:center;border:2px solid rgba(0,0,0,.25);color:#111}
+.ctl.hang{background:#c0392b}.ctl.ans{background:#2fb86a}
+.ctl.hang svg,.ctl.ans svg{width:42px;height:42px}.ctl.ans svg{transform:rotate(135deg)}
+.ctl.hang span,.ctl.ans span{display:none}
 </style>
 </head>
 <body>
@@ -1666,7 +1693,7 @@ function newConn(pid){
   const pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun.cloudflare.com:3478"}]});
   const c={pid,pc,dc:null,state:'attente',uid:null};
   conns[pid]=c;
-  pc.ontrack=e=>{const a=document.createElement('audio');a.autoplay=true;a.srcObject=e.streams[0]||new MediaStream([e.track]);document.body.append(a);if(call){call.au=a;call.rs=a.srcObject;}a.play().catch(()=>{});};
+  pc.ontrack=e=>{if(e.track.kind==='video'){if(call){call.rvTrack=e.track;e.track.onmute=()=>{if(call&&call.rvTrack===e.track){call.rvTrack=null;updateVideos();}};e.track.onunmute=()=>{if(call){call.rvTrack=e.track;updateVideos();}};updateVideos();}return;}const a=document.createElement('audio');a.autoplay=true;a.srcObject=e.streams[0]||new MediaStream([e.track]);document.body.append(a);if(call){call.au=a;call.rs=a.srcObject;a.muted=!!call.deaf;}a.play().catch(()=>{});};
   c.tm=setTimeout(()=>{if(c.state!=='live'){c.state='off';if(!c.uid){try{pc.close();}catch(e){}delete conns[pid];}renderAll();}},25000);
   pc.onconnectionstatechange=()=>{
     const st=pc.connectionState;
@@ -1861,6 +1888,7 @@ function endCall(send){
   if(!call)return;const k=call;call=null;
   if(send&&k.c.dc&&k.c.dc.readyState==='open')dcSend(k.c,{type:'call',a:'end'});
   if(k.st)k.st.getTracks().forEach(t=>t.stop());
+  if(k.vs)k.vs.getTracks().forEach(t=>t.stop());
   if(k.au)k.au.remove();
   if(k.ctx)try{k.ctx.close();}catch(e){}
   closeCallUi();
@@ -2188,33 +2216,65 @@ async function answerCall(){
   if(!st){endCall(true);return;}
   call.st=st;showCall('live',f);dcSend(c,{type:'call',a:'ok'});
 }
+function updateVideos(){
+  const ui=$('callui');if(!ui||!call)return;
+  const fv=ui.querySelector('.cv.f'),mv=ui.querySelector('.cv.m');
+  if(fv){if(call.rvTrack){fv.srcObject=new MediaStream([call.rvTrack]);fv.play().catch(()=>{});}else fv.srcObject=null;fv.parentNode.classList.toggle('hasvid',!!call.rvTrack);}
+  if(mv){mv.srcObject=call.vs||null;mv.parentNode.classList.toggle('hasvid',!!call.vs);}
+}
+async function renego(){const c=call&&call.c;if(!c)return;try{await c.pc.setLocalDescription(await c.pc.createOffer());dcSend(c,{type:'sdp',d:c.pc.localDescription});}catch(e){}}
+async function toggleCam(btn){
+  if(!call||!call.c)return;
+  if(call.vs){call.vs.getTracks().forEach(t=>t.stop());if(call.vsend)try{call.c.pc.removeTrack(call.vsend);}catch(e){}call.vs=null;call.vsend=null;btn.classList.remove('on');updateVideos();renego();return;}
+  try{const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}}});call.vs=st;call.vsend=call.c.pc.addTrack(st.getVideoTracks()[0],st);btn.classList.add('on');updateVideos();renego();}
+  catch(e){toast('Caméra indisponible');}
+}
+const SV=p=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';
+const IC={
+ mic:SV('<rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7"/><path class="sl" d="M4 4l16 16"/>'),
+ cam:SV('<path d="M3 8.5h3.6l1.7-2.8h7.4l1.7 2.8H21v11H3z"/><circle cx="12" cy="14" r="3.6"/>'),
+ spk:SV('<path d="M4 9.5h3.8L13 5.5v13l-5.2-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>'),
+ tel:'<svg viewBox="0 0 24 24"><path fill="#111" d="M12 9c-3.2 0-6.1.8-8.4 2.3-.5.3-.7.9-.5 1.4l.9 1.9c.3.6 1 .9 1.7.6l2.6-1.2c.5-.2.8-.7.8-1.2V11c1.6-.5 3.4-.5 5 0v1.8c0 .5.3 1 .8 1.2l2.6 1.2c.7.3 1.4 0 1.7-.6l.9-1.9c.2-.5 0-1.1-.5-1.4C18.1 9.8 15.2 9 12 9z"/></svg>'};
+const DOTS=[[91,5,1.9],[79,13,3],[97,20,3.1],[63,20,5.2],[44,33,6.3],[86,35,4.8],[30,43,8.3],[14,52,10],[72,50,6.5],[2,57,12],[56,59,8.5],[40,73,12],[20,89,14]];
 function showCall(mode,f){
   closeCallUi();if(!call)return;
   if(mode==='in')startRing();
-  const nm=friendName(f),ui=h('div',{});ui.id='callui';
+  const nm=friendName(f),ui=h('div',{class:'c2'});ui.id='callui';
   if(!call.ctx){try{call.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}
   if(call.ctx&&call.ctx.resume)call.ctx.resume();
-  const stat=h('div',{class:'cstat',text:mode==='out'?'Appel en cours…':mode==='in'?'Appel entrant':'00:00'});
-  const orbit=h('div',{class:'corbit'},h('div',{class:'cme'},avatar(S.me.name,S.me.hue,52,null,S.me.photo)));
-  const stage=h('div',{class:'cstage'+(mode==='live'?'':' ringing')},h('i',{class:'cring'}),h('i',{class:'cring'}),h('i',{class:'cring'}),avatar(nm,f.hue,150,null,f.photo),orbit);
-  const btn=(cls,ico,label,fn)=>h('button',{class:'cbtn '+cls,'aria-label':label,onclick:fn},h('span',{text:ico}),h('small',{text:label}));
-  const end=btn('red','📞','Raccrocher',()=>endCall(true));
-  const pick=h('div',{class:'cpick'},...['🔥','😂','❤️','👏','🎉'].map(x=>h('button',{class:'ghost',text:x,onclick:()=>{dcSend(call.c,{type:'react',e:x});floatReact(x);}})));
-  let dock;
-  if(mode==='out')dock=[end];
-  else if(mode==='in')dock=[btn('red','✕','Refuser',()=>endCall(true)),btn('green','📞','Répondre',answerCall)];
-  else dock=[btn('','🎤','Micro',e=>{const b=e.currentTarget,tr=call.st?call.st.getAudioTracks():[],on=tr.some(t=>t.enabled);tr.forEach(t=>t.enabled=!on);b.classList.toggle('off',on);b.firstChild.textContent=on?'🔇':'🎤';}),btn('','✨','Réactions',()=>pick.classList.toggle('on')),end];
-  ui.append(h('div',{class:'ctop'},h('div',{class:'cname',text:nm}),stat),stage,pick,h('div',{class:'cdock'},...dock));
+  const mkC=(cls,name,hue,photo,vc)=>{
+    const v=document.createElement('video');v.className='cv '+vc;v.autoplay=true;v.muted=vc==='m';v.setAttribute('playsinline','');
+    return h('div',{class:'cc '+cls+(mode==='live'?'':' ringing')},avatar(name,hue,200,null,photo),v);
+  };
+  const friendC=mkC('friend',nm,f.hue,f.photo,'f'),meC=mkC('me',S.me.name,S.me.hue,S.me.photo,'m');
+  const dots=h('div',{class:'cdots'},...DOTS.map(([x,y,sz],i)=>{const d=h('i',{class:'cdot'});d.style.cssText='left:'+x+'%;top:'+y+'%;width:'+sz+'vw;height:'+sz+'vw;animation-duration:'+(4+(i%5)*.8)+'s;animation-delay:-'+(i*.7)+'s';return d;}));
+  const stat=h('span',{text:mode==='out'?'Appel en cours…':mode==='in'?'Appel entrant':'00:00'});
+  const ctl=(cls,svg,label,x,y,fn)=>{
+    const b=h('button',{class:'ctl '+cls,'aria-label':label,onclick:e=>{const t=e.currentTarget;t.classList.remove('pop');void t.offsetWidth;t.classList.add('pop');fn(t);}});
+    b.style.left=x+'%';b.style.top=y+'%';b.innerHTML=svg+'<span>'+label+'</span>';return b;
+  };
+  const hang=(x)=>ctl('hang',IC.tel,'Raccrocher',x,91,()=>endCall(true));
+  let btns;
+  if(mode==='out')btns=[hang(47)];
+  else if(mode==='in')btns=[ctl('hang',IC.tel,'Refuser',33,89,()=>endCall(true)),ctl('ans',IC.tel,'Répondre',62,89,()=>answerCall())];
+  else btns=[
+    ctl('',IC.mic,'micro',75,30,t=>{const tr=call.st?call.st.getAudioTracks():[],on=tr.some(x=>x.enabled);tr.forEach(x=>x.enabled=!on);t.classList.toggle('off',on);}),
+    ctl('',IC.cam,'Camera',60,40,t=>toggleCam(t)),
+    ctl('',IC.spk,'sourdine',42,54,t=>{call.deaf=!call.deaf;if(call.au)call.au.muted=call.deaf;t.classList.toggle('on',call.deaf);}),
+    hang(47)];
+  ui.append(dots,friendC,meC,h('div',{class:'cn'},h('b',{text:nm}),stat),...btns);
   document.body.append(ui);
   if(mode==='live'){
+    updateVideos();
     const t0=Date.now();
     cuiT=setInterval(()=>{const t=Math.floor((Date.now()-t0)/1000);stat.textContent=String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');},500);
     const loop=()=>{
       if(!call||!call.ctx)return;
       if(!cuiAn.me&&call.st)cuiAn.me=mkAn(call.ctx,call.st);
       if(!cuiAn.rm&&call.rs)cuiAn.rm=mkAn(call.ctx,call.rs);
-      stage.style.setProperty('--lv',cuiAn.rm?lvl(cuiAn.rm):0);
-      orbit.style.setProperty('--lv',cuiAn.me&&call.st&&call.st.getAudioTracks().some(t=>t.enabled)?lvl(cuiAn.me):0);
+      const lf=cuiAn.rm?lvl(cuiAn.rm):0,lm=cuiAn.me&&call.st&&call.st.getAudioTracks().some(t=>t.enabled)?lvl(cuiAn.me):0;
+      friendC.style.setProperty('--lv',lf);meC.style.setProperty('--lv',lm);dots.style.setProperty('--lv',Math.max(lf,lm));
+      friendC.classList.toggle('speak',lf>.14);meC.classList.toggle('speak',lm>.14);
       cuiRaf=requestAnimationFrame(loop);
     };
     loop();
