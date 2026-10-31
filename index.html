@@ -242,6 +242,18 @@ button:active{transform:scale(.94)}
 .mgcard{display:grid;gap:6px;padding:12px;border:1px solid var(--line);border-radius:18px}
 .mgcard.on{border-color:var(--accent)}
 .mgcard .bub{margin-bottom:6px}
+/* ---------- Forum ---------- */
+#forum{position:fixed;inset:0;z-index:14;background:var(--bg);display:flex;flex-direction:column;animation:fadeIn .2s}
+#forum[hidden]{display:none}
+.fhead{display:flex;align-items:center;gap:10px;padding:max(12px,env(safe-area-inset-top,0px)) 14px 12px;border-bottom:1px solid var(--line)}
+.fhead h2{margin:0;font-size:20px}
+#feed{flex:1;overflow:auto;padding:14px 14px 110px;display:grid;gap:14px;align-content:start;max-width:640px;width:100%;margin:0 auto}
+.post{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;animation:rise .35s both}
+.post .ph{display:flex;align-items:center;gap:10px;padding:12px 14px}
+.post img.pimg{display:block;width:100%;max-height:420px;object-fit:cover;cursor:pointer}
+.post .pt{padding:12px 14px;white-space:pre-wrap;word-break:break-word}
+.grow{flex:1;min-width:0}
+.fab{position:fixed;left:18px;bottom:max(20px,env(safe-area-inset-bottom,0px));width:58px;height:58px;min-height:0;border-radius:50%;font-size:32px;line-height:1;padding:0;z-index:16;box-shadow:0 10px 28px color-mix(in srgb,var(--accent) 50%,transparent)}
 </style>
 </head>
 <body>
@@ -1658,7 +1670,7 @@ function waitIce(pc){
 }
 function wireDC(c,dc){
   c.dc=dc;
-  dc.onopen=()=>{c.state='live';shareKey(c);sendProfile(c);sendGroupsTo(c);flushPending(c.uid);renderAll();};
+  dc.onopen=()=>{c.state='live';shareKey(c);sendProfile(c);sendHave(c);sendGroupsTo(c);flushPending(c.uid);renderAll();};
   dc.onclose=()=>{c.state='off';renderAll();reconnectAll();};
   dc.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(err){return;}if(c.uid)receive(c.uid,m);};
 }
@@ -1983,6 +1995,79 @@ function openMessagium(){
       h('div',{class:'row'},h('button',{text:'Aperçu',onclick:()=>playSend(x.id)}),h('button',{class:S.me.mg===x.id?'':'primary',text:S.me.mg===x.id?'Choisi ✓':'Choisir',onclick:set(x.id)})))),
     S.me.mg?h('button',{class:'ghost',text:'Sans Messagium',onclick:set(null)}):null]);
 }
+/* ---------- Forum : posts photo + texte entre amis ---------- */
+const postBuf={};
+const conLive=()=>Object.values(conns).filter(c=>c.uid&&c.dc&&c.dc.readyState==='open');
+function trimPosts(){
+  const a=(S.posts||[]).sort((x,y)=>x.t-y.t);let mc=0,oc=0;const keep=[];
+  for(let i=a.length-1;i>=0;i--){const p=a[i];if(p.uid===S.me.id){if(mc++<15)keep.push(p);}else if(oc++<25)keep.push(p);}
+  S.posts=keep.reverse();
+}
+function sendPost(c,p){
+  const d=p.img||'',n=Math.max(1,Math.ceil(d.length/15000));
+  for(let i=0;i<n;i++)if(!dcSend(c,{type:'post',id:p.id,t:p.t,text:i?undefined:p.text,n,i,d:d.slice(i*15000,(i+1)*15000)}))return;
+}
+function sendHave(c){dcSend(c,{type:'phave',ids:(S.posts||[]).filter(p=>p.uid===c.uid).map(p=>p.id).slice(-30)});}
+function onHave(uid,m){
+  const c=connOf(uid);if(!c||!Array.isArray(m.ids))return;
+  const ids=m.ids.slice(0,50).filter(x=>typeof x==='string'),have=new Set(ids),mine=(S.posts||[]).filter(p=>p.uid===S.me.id),mineIds=new Set(mine.map(p=>p.id));
+  mine.filter(p=>!have.has(p.id)).slice(-10).forEach(p=>sendPost(c,p));
+  ids.forEach(id=>{if(!mineIds.has(id))dcSend(c,{type:'pdel',id});});
+}
+function onPost(uid,m){
+  if(typeof m.id!=='string'||m.id.length>20||!(m.n>=1&&m.n<=60)||typeof m.d!=='string')return;
+  S.posts=S.posts||[];
+  if(S.posts.some(p=>p.id===m.id))return;
+  const b=postBuf[m.id]=postBuf[m.id]||{p:[],k:0,t:m.t,text:''};
+  if(m.i===0)b.text=String(m.text||'').slice(0,500);
+  if(b.p[m.i]===undefined){b.p[m.i]=m.d;b.k++;}
+  if(b.k<m.n)return;
+  delete postBuf[m.id];
+  const d=b.p.join(''),f=S.friends.find(x=>x.id===uid);
+  if((d&&!d.startsWith('data:image/'))||d.length>900000)return;
+  S.posts.push({id:m.id,uid,name:f?friendName(f):'',hue:f?f.hue:0,text:b.text,img:d||null,t:Math.min(Number(b.t)||Date.now(),Date.now())});
+  trimPosts();saveData();renderForum();
+  if($('forum').hidden)toast('Nouveau Mainz de '+(f?friendName(f):'un ami'));
+}
+function publishPost(text,img){
+  const p={id:rnd(10),uid:S.me.id,name:S.me.name,hue:S.me.hue,text,img:img||null,t:Date.now()};
+  S.posts=S.posts||[];S.posts.push(p);trimPosts();saveData();
+  conLive().forEach(c=>sendPost(c,p));
+  renderForum();toast('Publié');
+}
+function postEl(p){
+  const mine=p.uid===S.me.id,f=S.friends.find(x=>x.id===p.uid);
+  const nm=mine?S.me.name:(f?friendName(f):(p.name||'Ami')),a=mine?S.me:(f||p);
+  return h('article',{class:'post'},
+    h('div',{class:'ph'},avatar(nm,a.hue,40,null,a.photo),
+      h('div',{class:'grow'},h('b',{text:nm}),h('div',{class:'muted',text:new Date(p.t).toLocaleString('fr-CA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})})),
+      mine?h('button',{class:'ghost',text:'🗑',onclick:()=>{if(!confirm('Supprimer ce Mainz ?'))return;S.posts=S.posts.filter(x=>x!==p);saveData();conLive().forEach(c=>dcSend(c,{type:'pdel',id:p.id}));renderForum();}}):null),
+    p.img?h('img',{class:'pimg',src:p.img,alt:'photo',onclick:()=>openOverlay([header('Photo'),h('img',{src:p.img,style:'width:100%;border-radius:14px'})])}):null,
+    p.text?h('div',{class:'pt',text:p.text}):null);
+}
+function renderForum(){
+  const fd=$('feed');if(!fd)return;
+  const ids=new Set(S.friends.map(f=>f.id));
+  const list=(S.posts||[]).filter(p=>p.uid===S.me.id||ids.has(p.uid)).sort((a,b)=>b.t-a.t);
+  fd.replaceChildren(...(list.length?list.map(postEl):[h('p',{class:'muted',style:'text-align:center;padding:40px 10px',text:'Aucun Mainz pour l\'instant. Appuie sur + pour en publier un !'})]));
+}
+function openPost(){
+  let img=null;
+  const prev=h('img',{style:'width:100%;max-height:260px;object-fit:cover;border-radius:14px;display:none'});
+  const file=h('input',{type:'file',accept:'image/*',hidden:true});
+  const tx=h('textarea',{placeholder:'Écris ton Mainz…',maxLength:500,rows:4});
+  const err=h('div',{class:'err'});
+  file.addEventListener('change',async()=>{const f=file.files[0];if(!f)return;try{img=await fitPhoto(f,720);prev.src=img;prev.style.display='block';}catch(e){err.textContent='Image non prise en charge';}});
+  openOverlay([header('Nouveau Mainz'),prev,file,h('button',{text:'📷 Ajouter une photo',onclick:()=>file.click()}),tx,
+    h('button',{class:'primary',text:'Publier',onclick:()=>{const t=tx.value.trim();if(!t&&!img){err.textContent='Ajoute une photo ou du texte.';return;}publishPost(t,img);closeOverlay();}}),err]);
+}
+function buildForum(){
+  if(!S.me)return;S.posts=S.posts||[];
+  const fo=h('section',{},h('header',{class:'fhead'},h('button',{class:'ghost',text:'←','aria-label':'Retour',onclick:()=>{$('forum').hidden=true;}}),h('h2',{text:'Mainz'})),
+    h('div',{id:'feed'}),h('button',{class:'primary fab','aria-label':'Publier un Mainz',text:'+',onclick:openPost}));
+  fo.id='forum';fo.hidden=true;document.body.append(fo);
+}
+function openForum(){if(!$('forum'))buildForum();renderForum();$('forum').hidden=false;}
 function profileMsg(){return {type:'profile',name:S.me.name,hue:S.me.hue,photo:S.me.photo||null,bio:S.me.bio||'',accent:typeof S.me.accent==='number'?S.me.accent:null};}
 function bannerMsg(){return {type:'banner',banner:S.me.banner||null};}
 function sendProfile(c){if(c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify(profileMsg()));c.dc.send(JSON.stringify(bannerMsg()));}catch(e){}}}
@@ -2005,6 +2090,9 @@ function receive(id,m){
   if(m&&m.type==='profile'){applyProfile(id,m);return;}
   if(m&&m.type==='banner'){applyBanner(id,m);return;}
   if(m&&m.type==='key'){applyKey(id,m);return;}
+  if(m&&m.type==='post'){onPost(id,m);return;}
+  if(m&&m.type==='phave'){onHave(id,m);return;}
+  if(m&&m.type==='pdel'){S.posts=(S.posts||[]).filter(p=>!(p.id===m.id&&p.uid===id));saveData();renderForum();return;}
   if(m&&m.type==='groupinfo'){onGroupInfo(id,m.g);return;}
   if(m&&m.type==='gleave'){onGroupLeave(id,m.g);return;}
   if(m&&m.type==='gmsg'){onGroupMsg(id,m);return;}
@@ -2438,6 +2526,7 @@ function showLaunch(){
       n?h('button',{text:'Ajouter un ami',onclick:go(openAdd)}):null,
       h('button',{text:'Parler à Mesinter IA',onclick:()=>openChat('claude')}),
       h('button',{text:'Mon profil',onclick:go(openProfile)}),
+      h('button',{text:'Mainz',onclick:go(openForum)}),
       h('button',{text:'Mes émojis perso',onclick:go(openEmojis)}),
       h('button',{text:'Clé API Mesinter IA',onclick:openKeyDialog}),
       h('button',{text:'Exporter mes données',onclick:exportAll}),
@@ -2695,6 +2784,7 @@ startInbox();
 const flushAll=()=>{for(const f of S.friends)if(!f.group&&!f.ai)flushPending(f.id);reconnectAll();};
 addEventListener('online',flushAll);document.addEventListener('visibilitychange',()=>{if(!document.hidden)flushAll();});
 document.body.classList.add('boot');setTimeout(()=>document.body.classList.remove('boot'),1600);
+buildForum();
 applyAccent();
 renderAll();
 if(!S.me)askProfile(showLaunch);
