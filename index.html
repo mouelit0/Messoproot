@@ -1614,7 +1614,7 @@ const KEY='mesinter_v2';
 let S;try{S=JSON.parse(localStorage.getItem(KEY));}catch(e){}
 if(!S||typeof S!=='object')S={};
 S.me=S.me||null;S.friends=S.friends||[];S.msgs=S.msgs||{};S.unread=S.unread||{};S.nick=S.nick||{};
-function saveData(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function saveData(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}if(S&&S.acct)scheduleBackup();}
 // Connexions directes : pid = identifiant de la connexion, uid = identifiant stable de l'ami
 const conns={};
 let cur=null,stopCam=null;
@@ -2075,6 +2075,84 @@ function buildForum(){
   fo.id='forum';fo.hidden=true;document.body.append(fo);
 }
 function openForum(){if(!$('forum'))buildForum();renderForum();$('forum').hidden=false;}
+/* ---------- Compte : connexion depuis n'importe quel téléphone ---------- */
+const TE=new TextEncoder();let cloudUrl=null,bkT=null,bkLast=0;
+const hx=u=>Array.from(u,x=>x.toString(16).padStart(2,'0')).join('');
+async function derive(name,pw){
+  const base=await crypto.subtle.importKey('raw',TE.encode(pw),'PBKDF2',false,['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',iterations:200000,salt:TE.encode('mesinter:'+name.trim().toLowerCase())},base,768));
+}
+const parts=b=>({id:hx(b.slice(0,16)),auth:hx(b.slice(16,48)),key:b.slice(48,80)});
+async function sealBlob(key,obj){
+  const j=TE.encode(JSON.stringify(obj,(k,v)=>k==='img'&&typeof v==='string'&&v.length>20000?undefined:v));
+  const gz=new Uint8Array(await new Response(new Blob([j]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+  const iv=crypto.getRandomValues(new Uint8Array(12)),k=await crypto.subtle.importKey('raw',key,'AES-GCM',false,['encrypt']);
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},k,gz)),out=new Uint8Array(12+ct.length);
+  out.set(iv);out.set(ct,12);return out;
+}
+async function openBlob(key,buf){
+  const a=new Uint8Array(buf),k=await crypto.subtle.importKey('raw',key,'AES-GCM',false,['decrypt']);
+  const gz=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:a.slice(0,12)},k,a.slice(12)));
+  return JSON.parse(new TextDecoder().decode(await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()));
+}
+async function cloudCall(method,p,body){
+  if(!cloudUrl){try{const j=await (await fetch('cloud.json',{cache:'no-store'})).json();if(typeof j.url==='string'&&j.url.indexOf('https://')===0)cloudUrl=j.url.replace(/\/$/,'');}catch(e){}}
+  if(!cloudUrl)throw new Error('Serveur de comptes non configuré (fichier cloud.json manquant).');
+  try{return await fetch(cloudUrl+'/a/'+p.id,{method,headers:{'X-Auth':p.auth},body});}
+  catch(e){throw new Error('Impossible de joindre le serveur. Internet requis.');}
+}
+async function doBackup(){
+  const p=parts(unb64(S.acct.k)),snap=Object.assign({},S);delete snap.acct;
+  const blob=await sealBlob(p.key,snap);if(blob.length>3900000)throw new Error('Trop gros');
+  const r=await cloudCall('PUT',p,blob);if(!r.ok)throw new Error('Sauvegarde refusée');
+}
+function scheduleBackup(){
+  if(bkT||!CAN_RELAY)return;
+  bkT=setTimeout(async()=>{bkT=null;if(Date.now()-bkLast<60000){scheduleBackup();return;}bkLast=Date.now();try{await doBackup();}catch(e){}},20000);
+}
+function openAccount(){
+  if(S.acct){
+    openOverlay([header('Compte'),h('p',{text:'Connecté : '+S.acct.name}),h('p',{class:'muted',text:'Tes données sont sauvegardées automatiquement, chiffrées avec ton mot de passe.'}),
+      h('button',{text:'Sauvegarder maintenant',onclick:async()=>{try{await doBackup();toast('Sauvegardé');}catch(e){toast(e.message||'Échec');}}}),
+      h('button',{class:'danger',text:'Se déconnecter (efface cet appareil)',onclick:async()=>{
+        try{await doBackup();}catch(e){if(!confirm('La dernière sauvegarde a échoué. Se déconnecter quand même ?'))return;}
+        if(!confirm('Les données de cet appareil seront effacées. Tu les retrouveras en te reconnectant.'))return;
+        localStorage.removeItem(KEY);location.reload();}})]);
+    return;
+  }
+  const name=h('input',{placeholder:'Nom de compte',autocomplete:'username',maxLength:30});
+  const pw=h('input',{type:'password',placeholder:'Mot de passe',autocomplete:'current-password'});
+  const pw2=h('input',{type:'password',placeholder:'Confirme le mot de passe (pour créer)',autocomplete:'new-password'});
+  const err=h('div',{class:'err'}),info=h('div',{class:'muted'});
+  const creds=async()=>{
+    err.textContent='';const n=name.value.trim();
+    if(n.length<3||pw.value.length<6){err.textContent='Nom : 3 caractères minimum. Mot de passe : 6 minimum.';return null;}
+    if(!CAN_RELAY){err.textContent='Chiffrement indisponible : ouvre l\'appli en https.';return null;}
+    info.textContent='Calcul sécurisé…';const bits=await derive(n,pw.value);return {n,bits,p:parts(bits)};
+  };
+  const login=async()=>{try{
+    const c=await creds();if(!c)return;
+    const r=await cloudCall('GET',c.p);
+    if(r.status===404)throw new Error('Compte introuvable ou mot de passe incorrect.');
+    if(!r.ok)throw new Error('Connexion refusée.');
+    let data;try{data=await openBlob(c.p.key,await r.arrayBuffer());}catch(e){throw new Error('Compte introuvable ou mot de passe incorrect.');}
+    if((S.friends&&S.friends.length)&&!confirm('Remplacer les données de cet appareil par celles du compte ?'))return;
+    Object.keys(S).forEach(k=>delete S[k]);Object.assign(S,data);S.acct={name:c.n,k:b64(c.bits)};saveData();location.reload();
+  }catch(e){info.textContent='';err.textContent=e.message||'Erreur';}};
+  const create=async()=>{try{
+    const c=await creds();if(!c)return;
+    if(pw.value!==pw2.value){info.textContent='';err.textContent='Les deux mots de passe sont différents.';return;}
+    const g=await cloudCall('GET',c.p);
+    if(g.status!==404)throw new Error('Ce compte existe déjà : utilise « Se connecter ».');
+    const snap=Object.assign({},S);delete snap.acct;
+    const r=await cloudCall('PUT',c.p,await sealBlob(c.p.key,snap));
+    if(!r.ok)throw new Error('Création refusée.');
+    S.acct={name:c.n,k:b64(c.bits)};saveData();toast('Compte créé');openAccount();
+  }catch(e){info.textContent='';err.textContent=e.message||'Erreur';}};
+  openOverlay([header('Compte'),h('p',{class:'muted',text:'Connecte-toi sur n\'importe quel téléphone avec ton nom et ton mot de passe. Il n\'y a aucun moyen de récupérer un mot de passe oublié.'}),
+    name,pw,h('button',{class:'primary',text:'Se connecter',onclick:login}),pw2,
+    h('button',{text:'Créer le compte avec mes données',onclick:create}),info,err]);
+}
 function profileMsg(){return {type:'profile',name:S.me.name,hue:S.me.hue,photo:S.me.photo||null,bio:S.me.bio||'',accent:typeof S.me.accent==='number'?S.me.accent:null};}
 function bannerMsg(){return {type:'banner',banner:S.me.banner||null};}
 function sendProfile(c){if(c.dc&&c.dc.readyState==='open'){try{c.dc.send(JSON.stringify(profileMsg()));c.dc.send(JSON.stringify(bannerMsg()));}catch(e){}}}
@@ -2534,6 +2612,7 @@ function showLaunch(){
       h('button',{text:'Parler à Mesinter IA',onclick:()=>openChat('claude')}),
       h('button',{text:'Mon profil',onclick:go(openProfile)}),
       h('button',{text:'Mainz',onclick:go(openForum)}),
+      h('button',{text:S.acct?'Compte : '+S.acct.name:'Compte et connexion',onclick:go(openAccount)}),
       h('button',{text:'Mes émojis perso',onclick:go(openEmojis)}),
       h('button',{text:'Clé API Mesinter IA',onclick:openKeyDialog}),
       h('button',{text:'Exporter mes données',onclick:exportAll}),
